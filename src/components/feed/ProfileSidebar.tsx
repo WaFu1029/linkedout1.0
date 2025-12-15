@@ -31,7 +31,7 @@ export function ProfileSidebar({ profile, post }: ProfileSidebarProps) {
   const industry = profile?.industry || post.industry || "Human Being";
 
   return (
-    <Card className="h-full p-6 flex flex-col shadow-brutal-lg">
+    <Card className="h-full p-6 flex flex-col">
       {/* Name and Industry */}
       <div className="mb-6">
         <h2 className="font-bold text-2xl mb-2">{firstName}</h2>

@@ -221,50 +221,44 @@ const Feed = () => {
         </div>
 
         {/* Main Content Area */}
-        <div className="flex-1 flex gap-6 py-6">
-          {/* Post Section - 65% */}
-          <div className="w-[65%] flex flex-col">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-4">
-              <h1 className="font-bold text-3xl tracking-tight">The Feed</h1>
-            </div>
-
-            {/* Post Card with transition */}
-            <div className="flex-1 relative overflow-hidden">
-              <div
-                className="h-full transition-transform duration-300 ease-out"
-                style={{
-                  transform: swipeDirection === 1 
-                    ? "translateX(-20px) scale(0.98)" 
-                    : swipeDirection === -1 
-                    ? "translateX(20px) scale(0.98)" 
-                    : "translateX(0) scale(1)",
-                }}
+        <div className="flex-1 flex flex-col py-6">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-4 px-0">
+            <h1 className="font-bold text-3xl tracking-tight">The Feed</h1>
+            {user && (
+              <Button
+                onClick={() => setShowCreate(true)}
+                className="border-[3px] border-foreground shadow-brutal"
               >
+                <Plus className="mr-2" />
+                Share
+              </Button>
+            )}
+          </div>
+
+          {/* Post and Profile Cards with transition - moving together */}
+          <div className="flex-1 relative overflow-hidden">
+            <div
+              className="h-full flex gap-6 transition-transform duration-300 ease-out"
+              style={{
+                transform: swipeDirection === 1 
+                  ? "translateX(-20px) scale(0.98)" 
+                  : swipeDirection === -1 
+                  ? "translateX(20px) scale(0.98)" 
+                  : "translateX(0) scale(1)",
+              }}
+            >
+              {/* Post Section - 65% */}
+              <div className="w-[65%] flex flex-col">
                 {currentPost && (
                   <SwipePostCard post={currentPost} currentUserEmail={user?.email} comments={[]} />
                 )}
               </div>
-            </div>
-          </div>
 
-          {/* Profile Section - 35% */}
-          <div className="w-[35%] flex flex-col">
-            {/* Share button */}
-            <div className="flex justify-end mb-4">
-              {user && (
-                <Button
-                  onClick={() => setShowCreate(true)}
-                  className="border-[3px] border-foreground shadow-brutal"
-                >
-                  <Plus className="mr-2" />
-                  Share
-                </Button>
-              )}
-            </div>
-            {/* Profile Sidebar */}
-            <div className="flex-1">
-              <ProfileSidebar profile={currentPostProfile || null} post={currentPost || null} />
+              {/* Profile Section - 35% */}
+              <div className="w-[35%] flex flex-col">
+                <ProfileSidebar profile={currentPostProfile || null} post={currentPost || null} />
+              </div>
             </div>
           </div>
         </div>
