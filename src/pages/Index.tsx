@@ -8,7 +8,7 @@ import { ArrowRight, Heart, Users, Archive, MessageSquare } from "lucide-react";
 
 const TypingText = ({ text, speed = 100 }: { text: string; speed?: number }) => {
   const [displayedText, setDisplayedText] = useState("");
-  const [showCursor, setShowCursor] = useState(true);
+  const [isTyping, setIsTyping] = useState(true);
 
   useEffect(() => {
     let currentIndex = 0;
@@ -18,31 +18,17 @@ const TypingText = ({ text, speed = 100 }: { text: string; speed?: number }) => 
         currentIndex++;
       } else {
         clearInterval(typingInterval);
-        // Blink cursor after typing is complete
-        const cursorInterval = setInterval(() => {
-          setShowCursor((prev) => !prev);
-        }, 530);
-        return () => clearInterval(cursorInterval);
+        setIsTyping(false);
       }
     }, speed);
 
     return () => clearInterval(typingInterval);
   }, [text, speed]);
 
-  // Cursor blink effect
-  useEffect(() => {
-    if (displayedText.length === text.length) {
-      const blinkInterval = setInterval(() => {
-        setShowCursor((prev) => !prev);
-      }, 530);
-      return () => clearInterval(blinkInterval);
-    }
-  }, [displayedText, text]);
-
   return (
     <span>
       {displayedText}
-      {showCursor && <span className="animate-pulse">_</span>}
+      {isTyping && <span className="animate-pulse">_</span>}
     </span>
   );
 };
