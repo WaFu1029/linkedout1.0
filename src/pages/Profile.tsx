@@ -18,7 +18,9 @@ import {
   X, 
   Plus, 
   Trash2, 
-  Quote 
+  Quote,
+  Sparkles,
+  ChevronDown
 } from "lucide-react";
 import { FailurePost } from "@/components/FailurePost";
 
@@ -276,11 +278,11 @@ const Profile = () => {
                   <h1 className="text-3xl md:text-4xl font-bold mb-2">{firstName}</h1>
                   
                   {editing ? (
-                    <div className="mt-3 max-w-xs">
+                    <div className="mt-3 max-w-xs relative">
                       <select
                         value={editData.industry}
                         onChange={(e) => setEditData({ ...editData, industry: e.target.value })}
-                        className="flex h-11 w-full bg-cream-warm px-4 py-2 text-base font-medium border-[3px] border-foreground transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                        className="flex h-11 w-full bg-cream-warm px-4 py-2 pr-12 text-base font-medium border-[3px] border-foreground transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 appearance-none"
                       >
                         <option value="">Select your industry</option>
                         {industries.map((ind) => (
@@ -289,6 +291,7 @@ const Profile = () => {
                           </option>
                         ))}
                       </select>
+                      <ChevronDown className="absolute right-5 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" />
                     </div>
                   ) : (
                     <p className="text-lg text-primary font-semibold font-mono mt-2">
@@ -362,7 +365,10 @@ const Profile = () => {
 
               {/* Hobbies */}
               <div className="mt-6">
-                <span className="font-bold text-sm uppercase tracking-wide block mb-3">🎯 Hobbies</span>
+                <div className="flex items-center gap-2 mb-3">
+                  <Sparkles className="w-4 h-4 text-primary" />
+                  <span className="font-bold text-sm uppercase tracking-wide">Hobbies</span>
+                </div>
                 
                 {editing ? (
                   <div className="space-y-3">
@@ -389,10 +395,11 @@ const Profile = () => {
                         onChange={(e) => setNewHobby(e.target.value)}
                         onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addHobby())}
                         placeholder="Add hobby..."
+                        className="shadow-none"
                       />
                       <Button 
                         onClick={addHobby}
-                        className="border-[3px] border-foreground"
+                        className="border-[3px] border-foreground shadow-none"
                         type="button"
                       >
                         <Plus className="w-4 h-4" />
@@ -427,7 +434,7 @@ const Profile = () => {
                       <Input
                         value={editData.favorite_food}
                         onChange={(e) => setEditData({ ...editData, favorite_food: e.target.value })}
-                        className="mt-1 h-9"
+                        className="mt-1 h-9 shadow-none"
                       />
                     ) : (
                       <p className="font-semibold mt-1">{profile.favorite_food || "—"}</p>
@@ -443,7 +450,7 @@ const Profile = () => {
                       <Input
                         value={editData.favorite_color}
                         onChange={(e) => setEditData({ ...editData, favorite_color: e.target.value })}
-                        className="mt-1 h-9"
+                        className="mt-1 h-9 shadow-none"
                       />
                     ) : (
                       <p className="font-semibold mt-1">{profile.favorite_color || "—"}</p>
@@ -459,7 +466,7 @@ const Profile = () => {
                       <Input
                         value={editData.favorite_artist}
                         onChange={(e) => setEditData({ ...editData, favorite_artist: e.target.value })}
-                        className="mt-1 h-9"
+                        className="mt-1 h-9 shadow-none"
                       />
                     ) : (
                       <p className="font-semibold mt-1">{profile.favorite_artist || "—"}</p>
