@@ -90,11 +90,17 @@ const Wall = () => {
       <main className="pt-24 pb-16">
         <div className="container mx-auto px-4">
           {/* Header */}
-          <div className="max-w-3xl mx-auto text-center mb-12">
+          <div className="max-w-3xl mx-auto text-center mb-8">
             <h1 className="text-4xl md:text-5xl font-bold mb-4">The Wall</h1>
-            <p className="text-xl text-muted-foreground">
+            <p className="text-xl text-muted-foreground mb-6">
               An anonymous, permanent archive of all failures ever shared.
             </p>
+            
+            {/* Stats */}
+            <div className="inline-block bg-foreground text-background px-6 py-4 border-[3px] border-foreground mb-8">
+              <p className="text-3xl font-bold font-mono">{mockWallPosts.length}</p>
+              <p className="text-sm uppercase tracking-wide">Failures archived forever</p>
+            </div>
           </div>
 
           {/* Search and Filter */}
@@ -151,14 +157,6 @@ const Wall = () => {
               </p>
             </div>
           )}
-
-          {/* Stats */}
-          <div className="max-w-3xl mx-auto mt-16 text-center">
-            <div className="inline-block bg-foreground text-background px-6 py-4 border-[3px] border-foreground">
-              <p className="text-3xl font-bold font-mono">{mockWallPosts.length}</p>
-              <p className="text-sm uppercase tracking-wide">Failures archived forever</p>
-            </div>
-          </div>
         </div>
       </main>
 
