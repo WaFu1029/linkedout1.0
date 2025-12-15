@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -22,7 +22,7 @@ const industries = [
 ];
 
 const Auth = () => {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const isSignup = searchParams.get("mode") === "signup";
   const [mode, setMode] = useState<"signin" | "signup">(isSignup ? "signup" : "signin");
@@ -31,6 +31,11 @@ const Auth = () => {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [industry, setIndustry] = useState("");
+
+  // Sync mode state with URL query params when they change
+  useEffect(() => {
+    setMode(isSignup ? "signup" : "signin");
+  }, [isSignup]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -134,7 +139,16 @@ const Auth = () => {
                 <div className="mt-6 text-center">
                   <button
                     type="button"
-                    onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
+                    onClick={() => {
+                      const newMode = mode === "signin" ? "signup" : "signin";
+                      setMode(newMode);
+                      // Update URL to match the mode
+                      if (newMode === "signup") {
+                        setSearchParams({ mode: "signup" });
+                      } else {
+                        setSearchParams({});
+                      }
+                    }}
                     className="text-sm text-muted-foreground hover:text-primary transition-colors"
                   >
                     {mode === "signin"
