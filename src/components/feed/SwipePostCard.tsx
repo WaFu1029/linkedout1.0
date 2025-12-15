@@ -59,17 +59,17 @@ export function SwipePostCard({ post, currentUserEmail, comments = [], isMobile 
   const wordCount = newComment.trim().split(/\s+/).filter(Boolean).length;
 
   return (
-    <Card className={`p-6 flex flex-col shadow-brutal-lg ${isMobile ? "h-full overflow-y-auto" : "h-full"}`}>
+    <Card className={`p-6 flex flex-col ${isMobile ? "h-full overflow-y-auto" : "h-full"}`}>
       {/* Author - only on mobile since desktop has sidebar */}
       {isMobile && (
         <div className="mb-4">
-          <p className="font-bold text-lg">{firstName}</p>
+          <p className="font-bold text-xl">{firstName}</p>
           <p className="text-sm font-semibold text-primary font-mono">{post.industry}</p>
         </div>
       )}
 
       {/* Content */}
-      <p className="font-medium text-lg leading-relaxed mb-5 flex-grow">{post.content}</p>
+      <p className="font-medium text-xl leading-relaxed mb-5 flex-grow">{post.content}</p>
 
       {/* Tags */}
       {post.tags && post.tags.length > 0 && (

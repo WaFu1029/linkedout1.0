@@ -59,6 +59,7 @@ const Feed = () => {
   const { user } = useAuth();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [swipeDirection, setSwipeDirection] = useState(0);
+  const [isTransitioning, setIsTransitioning] = useState(false);
   const [showProfileDrawer, setShowProfileDrawer] = useState(false);
   const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
   const [touchEnd, setTouchEnd] = useState<{ x: number; y: number } | null>(null);
@@ -95,18 +96,44 @@ const Feed = () => {
   const currentPostProfile = profiles.find((p) => p.email === currentPost?.author_email);
 
   const goNext = () => {
-    if (currentIndex < visiblePosts.length - 1) {
+    if (currentIndex < visiblePosts.length - 1 && !isTransitioning) {
+      setIsTransitioning(true);
       setSwipeDirection(1);
-      setCurrentIndex((prev) => prev + 1);
       setShowProfileDrawer(false);
+      // Wait for slide-out animation to complete before changing index
+      setTimeout(() => {
+        setCurrentIndex((prev) => prev + 1);
+        // Start new cards from the right (100%), then slide to center
+        setSwipeDirection(-1);
+        // Use requestAnimationFrame to ensure the DOM updates before animating
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            setSwipeDirection(0);
+            setIsTransitioning(false);
+          });
+        });
+      }, 500);
     }
   };
 
   const goPrev = () => {
-    if (currentIndex > 0) {
+    if (currentIndex > 0 && !isTransitioning) {
+      setIsTransitioning(true);
       setSwipeDirection(-1);
-      setCurrentIndex((prev) => prev - 1);
       setShowProfileDrawer(false);
+      // Wait for slide-out animation to complete before changing index
+      setTimeout(() => {
+        setCurrentIndex((prev) => prev - 1);
+        // Start new cards from the left (-100%), then slide to center
+        setSwipeDirection(1);
+        // Use requestAnimationFrame to ensure the DOM updates before animating
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            setSwipeDirection(0);
+            setIsTransitioning(false);
+          });
+        });
+      }, 500);
     }
   };
 
@@ -158,13 +185,7 @@ const Feed = () => {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [currentIndex, visiblePosts.length]);
 
-  // Reset swipe direction after animation
-  useEffect(() => {
-    if (swipeDirection !== 0) {
-      const timer = setTimeout(() => setSwipeDirection(0), 300);
-      return () => clearTimeout(timer);
-    }
-  }, [swipeDirection]);
+  // Note: swipeDirection is now reset in goNext/goPrev after index change
 
   if (postsLoading) {
     return (
@@ -239,13 +260,13 @@ const Feed = () => {
           {/* Post and Profile Cards with transition - moving together */}
           <div className="flex-1 relative overflow-hidden">
             <div
-              className="h-full flex gap-6 transition-transform duration-300 ease-out"
+              className="h-full flex gap-6 transition-transform duration-500 ease-in-out"
               style={{
                 transform: swipeDirection === 1 
-                  ? "translateX(-20px) scale(0.98)" 
+                  ? "translateX(-100%)" 
                   : swipeDirection === -1 
-                  ? "translateX(20px) scale(0.98)" 
-                  : "translateX(0) scale(1)",
+                  ? "translateX(100%)" 
+                  : "translateX(0)",
               }}
             >
               {/* Post Section - 65% */}
@@ -300,13 +321,13 @@ const Feed = () => {
         {/* Post Card with Animation */}
         <div className="h-full pt-20 pb-16 px-4 overflow-hidden">
           <div
-            className="h-full transition-transform duration-300 ease-out"
+            className="h-full transition-transform duration-500 ease-in-out"
             style={{
               transform: swipeDirection === 1 
-                ? "translateX(-20px) scale(0.98)" 
+                ? "translateX(-100%)" 
                 : swipeDirection === -1 
-                ? "translateX(20px) scale(0.98)" 
-                : "translateX(0) scale(1)",
+                ? "translateX(100%)" 
+                : "translateX(0)",
             }}
           >
             {currentPost && (
