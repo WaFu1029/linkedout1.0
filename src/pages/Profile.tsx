@@ -4,7 +4,7 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -342,14 +342,14 @@ const Profile = () => {
                   <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center border-[3px] border-foreground">
                     <Quote className="w-4 h-4 text-primary-foreground" />
                   </div>
-                  <span className="font-bold text-sm uppercase tracking-wide">Favorite Motivational Quote</span>
+                  <span className="font-bold text-sm uppercase tracking-wide">Favorite Quote</span>
                 </div>
                 
                 {editing ? (
                   <textarea
                     value={editData.motivational_quote}
                     onChange={(e) => setEditData({ ...editData, motivational_quote: e.target.value })}
-                    placeholder="What quote motivates you?"
+                    placeholder="What motivates you?"
                     className="flex min-h-[100px] w-full bg-cream-warm px-4 py-2 text-base font-medium border-[3px] border-foreground transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 resize-none"
                   />
                 ) : profile.motivational_quote ? (
@@ -473,7 +473,7 @@ const Profile = () => {
                     ) : (
                       <p className="font-semibold mt-1">{profile.favorite_artist || "—"}</p>
                     )}
-            </div>
+                  </div>
                 </div>
               </div>
             </Card>
