@@ -366,7 +366,9 @@ const Profile = () => {
               {/* Hobbies */}
               <div className="mt-6">
                 <div className="flex items-center gap-2 mb-3">
-                  <Sparkles className="w-4 h-4 text-primary" />
+                  <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center border-[3px] border-foreground">
+                    <Sparkles className="w-4 h-4 text-primary-foreground" />
+                  </div>
                   <span className="font-bold text-sm uppercase tracking-wide">Hobbies</span>
                 </div>
                 
