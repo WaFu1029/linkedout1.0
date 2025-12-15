@@ -208,7 +208,7 @@ const Feed = () => {
       <Navbar />
 
       {/* Desktop Layout */}
-      <div className="hidden md:flex h-[calc(100vh-64px)] px-4 pt-4">
+      <div className="hidden md:flex h-[calc(100vh-64px)] px-4 pt-24">
         {/* Left Arrow */}
         <div className="flex items-center pr-4">
           <button
@@ -226,12 +226,7 @@ const Feed = () => {
           <div className="w-[65%] flex flex-col">
             {/* Header */}
             <div className="flex items-center justify-between mb-4">
-              <div>
-                <h1 className="font-bold text-3xl tracking-tight">The Feed</h1>
-                <p className="text-sm font-semibold text-muted-foreground font-mono">
-                  {currentIndex + 1} of {visiblePosts.length} failures
-                </p>
-              </div>
+              <h1 className="font-bold text-3xl tracking-tight">The Feed</h1>
             </div>
 
             {/* Post Card with transition */}
@@ -289,19 +284,14 @@ const Feed = () => {
       {/* Mobile Layout */}
       <div
         ref={containerRef}
-        className="md:hidden h-[calc(100vh-64px)] relative overflow-hidden"
+        className="md:hidden h-[calc(100vh-64px)] relative overflow-hidden pt-16"
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
       >
         {/* Header */}
-        <div className="absolute top-0 left-0 right-0 z-10 p-4 flex items-center justify-between bg-gradient-to-b from-background via-background/95 to-transparent">
-          <div>
-            <h1 className="font-bold text-xl tracking-tight">The Feed</h1>
-            <p className="text-xs font-semibold text-muted-foreground font-mono">
-              {currentIndex + 1}/{visiblePosts.length}
-            </p>
-          </div>
+        <div className="absolute top-0 left-0 right-0 z-10 p-4 flex items-center justify-between bg-gradient-to-b from-background via-background/95 to-transparent pt-16">
+          <h1 className="font-bold text-xl tracking-tight">The Feed</h1>
           {user && (
             <Button
               onClick={() => setShowCreate(true)}
