@@ -5,11 +5,12 @@ import { Button } from "@/components/ui/button";
 import { SwipePostCard } from "@/components/feed/SwipePostCard";
 import { ProfileSidebar } from "@/components/feed/ProfileSidebar";
 import { MobileProfileDrawer } from "@/components/feed/MobileProfileDrawer";
+import { CreatePostDialog } from "@/components/feed/CreatePostDialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { ChevronLeft, ChevronRight, ChevronUp, Plus, Loader2, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useQuery } from "@tanstack/react-query";
-import { subWeeks } from "date-fns";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { subWeeks, formatDistanceToNow } from "date-fns";
 
 // Mock data structure - will be replaced with Supabase queries
 const mockPosts = [
@@ -57,6 +58,7 @@ const mockPosts = [
 
 const Feed = () => {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [swipeDirection, setSwipeDirection] = useState(0);
   const [entryDirection, setEntryDirection] = useState<1 | -1 | 0>(0);
@@ -67,16 +69,69 @@ const Feed = () => {
   const [showCreate, setShowCreate] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // TODO: Replace with actual Supabase queries when posts table exists
-  const { data: allPosts = mockPosts, isLoading: postsLoading } = useQuery({
+  // Fetch posts from Supabase
+  const { data: allPosts = [], isLoading: postsLoading } = useQuery({
     queryKey: ["posts"],
     queryFn: async () => {
-      // Placeholder for future Supabase query
-      return mockPosts;
+      const { data: postsData, error: postsError } = await supabase
+        .from("posts")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (postsError) {
+        console.error("Error fetching posts:", postsError);
+        // Fallback to mock data if table doesn't exist yet
+        if (postsError.code === "PGRST205" || postsError.message?.includes("Could not find the table")) {
+          return mockPosts;
+        }
+        return [];
+      }
+
+      if (!postsData || postsData.length === 0) {
+        return mockPosts; // Fallback to mock data if no posts exist
+      }
+
+      // Fetch reactions for all posts
+      const postIds = postsData.map((p) => p.id);
+      const { data: reactionsData } = await supabase
+        .from("reactions")
+        .select("*")
+        .in("post_id", postIds);
+
+      // Group reactions by post
+      const reactionsByPost: Record<string, any> = {};
+      reactionsData?.forEach((reaction) => {
+        if (!reactionsByPost[reaction.post_id]) {
+          reactionsByPost[reaction.post_id] = {};
+        }
+        reactionsByPost[reaction.post_id][reaction.reaction_type] =
+          (reactionsByPost[reaction.post_id][reaction.reaction_type] || 0) + 1;
+      });
+
+      // Fetch profiles to get author info
+      const { data: profilesData } = await supabase.from("profiles").select("*");
+      const profiles = profilesData || [];
+
+      // Transform posts to match expected format
+      return postsData.map((post) => {
+        const authorProfile = profiles.find((p) => p.id === post.author_id);
+        return {
+          id: post.id,
+          author: authorProfile?.full_name || authorProfile?.email?.split("@")[0] || "Anonymous",
+          industry: authorProfile?.industry || "Human Being",
+          content: post.content,
+          tags: post.tags || [],
+          timestamp: formatDistanceToNow(new Date(post.created_at), { addSuffix: true }),
+          reactions: reactionsByPost[post.id] || {},
+          author_email: authorProfile?.email || post.author_id,
+          author_id: post.author_id,
+        };
+      });
     },
+    enabled: true,
   });
 
-  // Fetch profiles for each post author
+  // Fetch profiles for each post author (for profile sidebar)
   const { data: profiles = [] } = useQuery({
     queryKey: ["profiles"],
     queryFn: async () => {
@@ -94,7 +149,7 @@ const Feed = () => {
   });
 
   const currentPost = visiblePosts[currentIndex];
-  const currentPostProfile = profiles.find((p) => p.email === currentPost?.author_email);
+  const currentPostProfile = profiles.find((p) => p.id === currentPost?.author_id || p.email === currentPost?.author_email);
 
   const goNext = () => {
     if (currentIndex < visiblePosts.length - 1 && !isTransitioning) {
@@ -364,6 +419,15 @@ const Feed = () => {
       </div>
 
       <Footer />
+
+      {/* Create Post Dialog */}
+      {user && (
+        <CreatePostDialog
+          open={showCreate}
+          onOpenChange={setShowCreate}
+          userId={user.id}
+        />
+      )}
     </div>
   );
 };
