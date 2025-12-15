@@ -76,38 +76,16 @@ const Profile = () => {
 
         if (!profileId) {
           if (user) {
-            // If logged in but no profile yet, create one
-            const { data: existingProfile } = await supabase
-              .from("profiles")
-              .select("*")
-              .eq("id", user.id)
-              .single();
-
-            if (!existingProfile) {
-              // Create a basic profile
-              const { data: newProfile } = await supabase
-                .from("profiles")
-                .insert({
-                  id: user.id,
-                  email: user.email,
-                  full_name: user.user_metadata?.full_name || user.email?.split("@")[0] || "User",
-                  industry: user.user_metadata?.industry || null,
-                })
-                .select()
-                .single();
-
-              if (newProfile) {
-                setProfile(newProfile);
-              }
-            } else {
-              setProfile(existingProfile);
-            }
+            navigate("/auth");
           } else {
             navigate("/auth");
           }
           setLoading(false);
           return;
         }
+
+        // Check if this is the user's own profile (no id param means own profile)
+        const isViewingOwnProfile = !id && user?.id === profileId;
 
         const { data, error } = await supabase
           .from("profiles")
@@ -116,13 +94,56 @@ const Profile = () => {
           .single();
 
         if (error) {
-          console.error("Error loading profile:", error);
-          toast.error("Failed to load profile");
-          if (isOwnProfile) {
-            navigate("/profile");
+          // If viewing own profile and it doesn't exist (PGRST116 = no rows returned), create it
+          if (isViewingOwnProfile && (error.code === "PGRST116" || error.message?.includes("No rows"))) {
+            // Profile doesn't exist, create it
+            const { data: newProfile, error: insertError } = await supabase
+              .from("profiles")
+              .insert({
+                id: user!.id,
+                email: user!.email || "",
+                full_name: user!.user_metadata?.full_name || user!.email?.split("@")[0] || "User",
+                industry: user!.user_metadata?.industry || null,
+              })
+              .select()
+              .single();
+
+            if (insertError) {
+              console.error("Error creating profile:", insertError);
+              toast.error("Failed to create profile");
+              setLoading(false);
+              return;
+            } else if (newProfile) {
+              setProfile(newProfile);
+            }
+          } else {
+            console.error("Error loading profile:", error);
+            toast.error("Failed to load profile");
           }
-        } else {
+        } else if (data) {
           setProfile(data);
+        } else {
+          // No data returned and no error - profile doesn't exist
+          if (isViewingOwnProfile && user) {
+            // Create profile for own profile view
+            const { data: newProfile, error: insertError } = await supabase
+              .from("profiles")
+              .insert({
+                id: user.id,
+                email: user.email || "",
+                full_name: user.user_metadata?.full_name || user.email?.split("@")[0] || "User",
+                industry: user.user_metadata?.industry || null,
+              })
+              .select()
+              .single();
+
+            if (insertError) {
+              console.error("Error creating profile:", insertError);
+              toast.error("Failed to create profile");
+            } else if (newProfile) {
+              setProfile(newProfile);
+            }
+          }
         }
       } catch (error) {
         console.error("Error:", error);
@@ -132,8 +153,12 @@ const Profile = () => {
       }
     };
 
-    loadProfile();
-  }, [id, user, navigate, isOwnProfile]);
+    if (user || id) {
+      loadProfile();
+    } else {
+      navigate("/auth");
+    }
+  }, [id, user, navigate]);
 
   const startEditing = () => {
     if (profile) {
