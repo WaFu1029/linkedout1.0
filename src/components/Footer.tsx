@@ -23,7 +23,7 @@ export function Footer() {
             </div>
           </div>
           <div>
-            <h4 className="font-bold mb-4 uppercase tracking-wide">Manifesto</h4>
+            <h4 className="font-bold mb-4 uppercase tracking-wide">Why?</h4>
             <p className="text-sm opacity-80">
               Success is overrated. Failure is human.
             </p>
