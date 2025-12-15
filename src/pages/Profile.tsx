@@ -280,7 +280,7 @@ const Profile = () => {
                       <select
                         value={editData.industry}
                         onChange={(e) => setEditData({ ...editData, industry: e.target.value })}
-                        className="flex h-11 w-full bg-cream-warm px-4 py-2 text-base font-medium border-[3px] border-foreground shadow-brutal transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                        className="flex h-11 w-full bg-cream-warm px-4 py-2 text-base font-medium border-[3px] border-foreground transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                       >
                         <option value="">Select your industry</option>
                         {industries.map((ind) => (
@@ -298,7 +298,7 @@ const Profile = () => {
                 </div>
 
                 {isOwnProfile && (
-                  <div className="flex gap-2">
+                <div className="flex gap-2">
                     {editing ? (
                       <>
                         <Button
@@ -311,7 +311,7 @@ const Profile = () => {
                         <Button
                           onClick={saveProfile}
                           disabled={saving}
-                          className="border-[3px] border-foreground shadow-brutal"
+                          className="border-[3px] border-foreground"
                         >
                           {saving ? (
                             <Loader2 className="w-4 h-4 animate-spin mr-1" />
@@ -319,15 +319,15 @@ const Profile = () => {
                             <Save className="w-4 h-4 mr-1" />
                           )}
                           Save
-                        </Button>
+                  </Button>
                       </>
                     ) : (
                       <Button
                         onClick={startEditing}
-                        className="border-[3px] border-foreground shadow-brutal"
+                        className="border-[3px] border-foreground"
                       >
                         <Edit2 className="w-4 h-4 mr-1" /> Edit Profile
-                      </Button>
+                  </Button>
                     )}
                   </div>
                 )}
@@ -347,10 +347,10 @@ const Profile = () => {
                     value={editData.motivational_quote}
                     onChange={(e) => setEditData({ ...editData, motivational_quote: e.target.value })}
                     placeholder="What quote motivates you?"
-                    className="flex min-h-[100px] w-full bg-cream-warm px-4 py-2 text-base font-medium border-[3px] border-foreground shadow-brutal transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 resize-none"
+                    className="flex min-h-[100px] w-full bg-cream-warm px-4 py-2 text-base font-medium border-[3px] border-foreground transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 resize-none"
                   />
                 ) : profile.motivational_quote ? (
-                  <div className="bg-secondary border-[3px] border-foreground shadow-brutal p-4">
+                  <div className="bg-secondary border-[3px] border-foreground p-4">
                     <p className="font-medium text-lg italic">
                       "{profile.motivational_quote}"
                     </p>
@@ -370,7 +370,7 @@ const Profile = () => {
                       {editData.hobbies?.map((hobby, i) => (
                         <span 
                           key={i}
-                          className="bg-primary text-primary-foreground px-4 py-2 font-semibold border-[3px] border-foreground shadow-brutal flex items-center gap-2"
+                          className="bg-primary text-primary-foreground px-4 py-2 font-semibold border-[3px] border-foreground flex items-center gap-2"
                         >
                           {hobby}
                           <button 
@@ -392,7 +392,7 @@ const Profile = () => {
                       />
                       <Button 
                         onClick={addHobby}
-                        className="border-[3px] border-foreground shadow-brutal"
+                        className="border-[3px] border-foreground"
                         type="button"
                       >
                         <Plus className="w-4 h-4" />
@@ -405,7 +405,7 @@ const Profile = () => {
                       profile.hobbies.map((hobby, i) => (
                         <span 
                           key={i}
-                          className="bg-primary text-primary-foreground px-4 py-2 font-semibold border-[3px] border-foreground shadow-brutal"
+                          className="bg-primary text-primary-foreground px-4 py-2 font-semibold border-[3px] border-foreground"
                         >
                           {hobby}
                         </span>
@@ -419,7 +419,7 @@ const Profile = () => {
 
               {/* Favorites */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6">
-                <div className="flex items-center gap-3 bg-secondary p-4 border-[3px] border-foreground shadow-brutal">
+                <div className="flex items-center gap-3 bg-secondary p-4 border-[3px] border-foreground">
                   <UtensilsCrossed className="w-5 h-5 text-primary" />
                   <div className="flex-grow">
                     <span className="font-bold text-xs text-muted-foreground uppercase tracking-wide block">Favorite Food</span>
@@ -435,7 +435,7 @@ const Profile = () => {
                   </div>
                 </div>
                 
-                <div className="flex items-center gap-3 bg-secondary p-4 border-[3px] border-foreground shadow-brutal">
+                <div className="flex items-center gap-3 bg-secondary p-4 border-[3px] border-foreground">
                   <Palette className="w-5 h-5 text-primary" />
                   <div className="flex-grow">
                     <span className="font-bold text-xs text-muted-foreground uppercase tracking-wide block">Favorite Color</span>
@@ -451,7 +451,7 @@ const Profile = () => {
                   </div>
                 </div>
                 
-                <div className="flex items-center gap-3 bg-secondary p-4 border-[3px] border-foreground shadow-brutal">
+                <div className="flex items-center gap-3 bg-secondary p-4 border-[3px] border-foreground">
                   <Heart className="w-5 h-5 text-primary" />
                   <div className="flex-grow">
                     <span className="font-bold text-xs text-muted-foreground uppercase tracking-wide block">Favorite Artist</span>
@@ -464,7 +464,7 @@ const Profile = () => {
                     ) : (
                       <p className="font-semibold mt-1">{profile.favorite_artist || "—"}</p>
                     )}
-                  </div>
+            </div>
                 </div>
               </div>
             </Card>
@@ -477,7 +477,7 @@ const Profile = () => {
                   Your failures will appear here once you start sharing.
                 </p>
               </Card>
-            </div>
+                </div>
           </div>
         </div>
       </main>
