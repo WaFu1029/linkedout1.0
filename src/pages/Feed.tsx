@@ -59,6 +59,7 @@ const Feed = () => {
   const { user } = useAuth();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [swipeDirection, setSwipeDirection] = useState(0);
+  const [entryDirection, setEntryDirection] = useState<1 | -1 | 0>(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [showProfileDrawer, setShowProfileDrawer] = useState(false);
   const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
@@ -98,20 +99,21 @@ const Feed = () => {
   const goNext = () => {
     if (currentIndex < visiblePosts.length - 1 && !isTransitioning) {
       setIsTransitioning(true);
-      setSwipeDirection(1);
       setShowProfileDrawer(false);
-      // Wait for slide-out animation to complete before changing index
+      // Slide current cards out to the left
+      setSwipeDirection(1);
+      setEntryDirection(-1); // New cards will enter from right
+      // Wait for slide-out animation to complete
       setTimeout(() => {
         setCurrentIndex((prev) => prev + 1);
-        // Start new cards from the right (100%), then slide to center
+        // New cards start off-screen to the right
         setSwipeDirection(-1);
-        // Use requestAnimationFrame to ensure the DOM updates before animating
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            setSwipeDirection(0);
-            setIsTransitioning(false);
-          });
-        });
+        // Animate new cards from right to center
+        setTimeout(() => {
+          setSwipeDirection(0);
+          setEntryDirection(0);
+          setIsTransitioning(false);
+        }, 50);
       }, 500);
     }
   };
@@ -119,20 +121,21 @@ const Feed = () => {
   const goPrev = () => {
     if (currentIndex > 0 && !isTransitioning) {
       setIsTransitioning(true);
-      setSwipeDirection(-1);
       setShowProfileDrawer(false);
-      // Wait for slide-out animation to complete before changing index
+      // Slide current cards out to the right
+      setSwipeDirection(-1);
+      setEntryDirection(1); // New cards will enter from left
+      // Wait for slide-out animation to complete
       setTimeout(() => {
         setCurrentIndex((prev) => prev - 1);
-        // Start new cards from the left (-100%), then slide to center
+        // New cards start off-screen to the left
         setSwipeDirection(1);
-        // Use requestAnimationFrame to ensure the DOM updates before animating
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            setSwipeDirection(0);
-            setIsTransitioning(false);
-          });
-        });
+        // Animate new cards from left to center
+        setTimeout(() => {
+          setSwipeDirection(0);
+          setEntryDirection(0);
+          setIsTransitioning(false);
+        }, 50);
       }, 500);
     }
   };
@@ -178,12 +181,12 @@ const Feed = () => {
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "ArrowRight") goNext();
-      if (e.key === "ArrowLeft") goPrev();
+      if (e.key === "ArrowRight" && !isTransitioning) goNext();
+      if (e.key === "ArrowLeft" && !isTransitioning) goPrev();
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [currentIndex, visiblePosts.length]);
+  }, [currentIndex, visiblePosts.length, isTransitioning]);
 
   // Note: swipeDirection is now reset in goNext/goPrev after index change
 
@@ -260,6 +263,7 @@ const Feed = () => {
           {/* Post and Profile Cards with transition - moving together */}
           <div className="flex-1 relative overflow-hidden">
             <div
+              key={`${currentIndex}-${entryDirection}`}
               className="h-full flex gap-6 transition-transform duration-500 ease-in-out"
               style={{
                 transform: swipeDirection === 1 
@@ -321,6 +325,7 @@ const Feed = () => {
         {/* Post Card with Animation */}
         <div className="h-full pt-20 pb-16 px-4 overflow-hidden">
           <div
+            key={`${currentIndex}-${entryDirection}`}
             className="h-full transition-transform duration-500 ease-in-out"
             style={{
               transform: swipeDirection === 1 
