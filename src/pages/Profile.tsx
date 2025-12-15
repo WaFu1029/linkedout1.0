@@ -94,6 +94,14 @@ const Profile = () => {
           .single();
 
         if (error) {
+          // Handle table not found error
+          if (error.code === "PGRST205" || error.message?.includes("Could not find the table")) {
+            console.error("Profiles table not found. Please run the migration SQL file.");
+            toast.error("Database not set up. Please run the migration SQL in Supabase.");
+            setLoading(false);
+            return;
+          }
+          
           // If viewing own profile and it doesn't exist (PGRST116 = no rows returned), create it
           if (isViewingOwnProfile && (error.code === "PGRST116" || error.message?.includes("No rows"))) {
             // Profile doesn't exist, create it
@@ -232,13 +240,19 @@ const Profile = () => {
     );
   }
 
-  if (!profile) {
+  if (!profile && !loading) {
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
         <main className="pt-24 pb-16 flex items-center justify-center min-h-[60vh]">
-          <div className="text-center">
-            <p className="font-bold text-xl">Profile not found</p>
+          <div className="text-center max-w-md">
+            <p className="font-bold text-xl mb-4">Profile not found</p>
+            <p className="text-muted-foreground text-sm">
+              If you just set up the database, make sure you've run the migration SQL file in your Supabase dashboard.
+            </p>
+            <p className="text-muted-foreground text-xs mt-2 font-mono">
+              See: supabase/migrations/20240101000000_create_profiles_table.sql
+            </p>
           </div>
         </main>
         <Footer />
