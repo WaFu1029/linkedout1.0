@@ -49,6 +49,40 @@ const Auth = () => {
     setMode(isSignup ? "signup" : "signin");
   }, [isSignup]);
 
+  // Handle email confirmation callback and hash fragments
+  useEffect(() => {
+    const handleAuthCallback = async () => {
+      // Check for email confirmation token in URL hash
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const accessToken = hashParams.get("access_token");
+      const type = hashParams.get("type");
+
+      if (accessToken && type === "signup") {
+        // User confirmed email via redirect
+        const { data: { session }, error } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: hashParams.get("refresh_token") || "",
+        });
+
+        if (session && !error) {
+          toast.success("Email confirmed! Welcome!");
+          navigate("/profile");
+        }
+      }
+
+      // Also check for confirmed query param
+      const confirmed = searchParams.get("confirmed");
+      if (confirmed === "true") {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          toast.success("Email confirmed! You can now sign in.");
+          setSearchParams({});
+        }
+      }
+    };
+    handleAuthCallback();
+  }, [searchParams, setSearchParams, navigate]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -76,6 +110,7 @@ const Auth = () => {
               full_name: name,
               industry: industry,
             },
+            emailRedirectTo: window.location.origin + "/auth?confirmed=true",
           },
         });
 
@@ -85,8 +120,17 @@ const Auth = () => {
           return;
         }
 
+        // Check if email confirmation is required
+        if (authData.user && !authData.session) {
+          toast.success("Check your email to confirm your account, then sign in!");
+          setMode("signin");
+          setSearchParams({});
+          setLoading(false);
+          return;
+        }
+
         // Create profile in profiles table
-        if (authData.user) {
+        if (authData.user && authData.session) {
           const { error: profileError } = await supabase
             .from("profiles")
             .insert({
@@ -100,10 +144,10 @@ const Auth = () => {
             console.error("Profile creation error:", profileError);
             // Continue anyway as auth was successful
           }
-        }
 
-        toast.success("Welcome to LinkedOut! Ready to embrace your failures.");
-        navigate("/profile");
+          toast.success("Welcome to LinkedOut! Ready to embrace your failures.");
+          navigate("/profile");
+        }
       } else {
         if (!email.trim() || !password.trim()) {
           toast.error("Please enter your email and password");
@@ -111,19 +155,26 @@ const Auth = () => {
           return;
         }
 
-        const { error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
 
         if (error) {
-          toast.error(error.message);
+          // Check if it's an unconfirmed email error
+          if (error.message.includes("Email not confirmed") || error.message.includes("email_not_confirmed")) {
+            toast.error("Please check your email and click the confirmation link before signing in.");
+          } else {
+            toast.error(error.message);
+          }
           setLoading(false);
           return;
         }
 
-        toast.success("Welcome back! Your failures missed you.");
-        navigate("/profile");
+        if (data.session) {
+          toast.success("Welcome back! Your failures missed you.");
+          navigate("/profile");
+        }
       }
     } catch (error) {
       toast.error("An unexpected error occurred");
