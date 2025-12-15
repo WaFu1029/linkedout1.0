@@ -1,9 +1,51 @@
+import { useState, useEffect } from "react";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Link } from "react-router-dom";
 import { ArrowRight, Heart, Users, Archive, MessageSquare } from "lucide-react";
+
+const TypingText = ({ text, speed = 100 }: { text: string; speed?: number }) => {
+  const [displayedText, setDisplayedText] = useState("");
+  const [showCursor, setShowCursor] = useState(true);
+
+  useEffect(() => {
+    let currentIndex = 0;
+    const typingInterval = setInterval(() => {
+      if (currentIndex < text.length) {
+        setDisplayedText(text.slice(0, currentIndex + 1));
+        currentIndex++;
+      } else {
+        clearInterval(typingInterval);
+        // Blink cursor after typing is complete
+        const cursorInterval = setInterval(() => {
+          setShowCursor((prev) => !prev);
+        }, 530);
+        return () => clearInterval(cursorInterval);
+      }
+    }, speed);
+
+    return () => clearInterval(typingInterval);
+  }, [text, speed]);
+
+  // Cursor blink effect
+  useEffect(() => {
+    if (displayedText.length === text.length) {
+      const blinkInterval = setInterval(() => {
+        setShowCursor((prev) => !prev);
+      }, 530);
+      return () => clearInterval(blinkInterval);
+    }
+  }, [displayedText, text]);
+
+  return (
+    <span>
+      {displayedText}
+      {showCursor && <span className="animate-pulse">_</span>}
+    </span>
+  );
+};
 
 const Index = () => {
   return (
@@ -14,8 +56,8 @@ const Index = () => {
       <section className="pt-24 pb-48 md:pt-32 md:pb-64">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto text-center">
-            <div className="inline-block bg-foreground text-background px-4 py-2 mb-6 border-[3px] border-foreground font-mono text-sm animate-fade-in-up">
-              THE ANTI-LINKEDIN
+            <div className="inline-block bg-foreground text-background px-4 py-2 mb-6 border-[3px] border-foreground font-mono text-sm">
+              <TypingText text="THE ANTI-LINKEDIN" speed={80} />
             </div>
             <h1 className="text-5xl md:text-7xl font-bold mb-6 leading-tight animate-fade-in-up animation-delay-100">
               Share your <span className="text-primary">failures</span>.
