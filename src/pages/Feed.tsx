@@ -1,12 +1,17 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
-import { FailurePost } from "@/components/FailurePost";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Plus } from "lucide-react";
+import { SwipePostCard } from "@/components/feed/SwipePostCard";
+import { ProfileSidebar } from "@/components/feed/ProfileSidebar";
+import { MobileProfileDrawer } from "@/components/feed/MobileProfileDrawer";
+import { useAuth } from "@/contexts/AuthContext";
+import { ChevronLeft, ChevronRight, ChevronUp, Plus, Loader2, Sparkles } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
+import { subWeeks } from "date-fns";
 
-// Mock data for demo
+// Mock data structure - will be replaced with Supabase queries
 const mockPosts = [
   {
     id: "1",
@@ -16,8 +21,7 @@ const mockPosts = [
     tags: ["rejection", "job search", "tech industry"],
     timestamp: "2h ago",
     reactions: { same: 47, itsOk: 23, youreDoingGreat: 89, youGotThis: 156 },
-    comments: [{ text: "Been there too" }, { text: "Their loss honestly" }],
-    size: "lg" as const,
+    author_email: "jamie@example.com",
   },
   {
     id: "2",
@@ -27,7 +31,7 @@ const mockPosts = [
     tags: ["freelancing", "client work"],
     timestamp: "5h ago",
     reactions: { same: 234, itsOk: 45, youreDoingGreat: 67, youGotThis: 89 },
-    size: "sm" as const,
+    author_email: "marcus@example.com",
   },
   {
     id: "3",
@@ -37,7 +41,7 @@ const mockPosts = [
     tags: ["creative block", "client work", "rejection"],
     timestamp: "8h ago",
     reactions: { same: 189, itsOk: 78, youreDoingGreat: 234, youGotThis: 167 },
-    size: "tall" as const,
+    author_email: "priya@example.com",
   },
   {
     id: "4",
@@ -47,112 +51,307 @@ const mockPosts = [
     tags: ["startup failure", "entrepreneurship", "lessons learned"],
     timestamp: "1d ago",
     reactions: { same: 89, itsOk: 156, youreDoingGreat: 423, youGotThis: 534 },
-    comments: [{ text: "Respect for sharing" }],
-    size: "wide" as const,
+    author_email: "alex@example.com",
   },
-  {
-    id: "5",
-    author: "Sam Torres",
-    industry: "Healthcare",
-    content: "Forgot to unmute on my first ever conference presentation. Spoke for 5 minutes to silence. 200 attendees.",
-    tags: ["public speaking", "embarrassing"],
-    timestamp: "2d ago",
-    reactions: { same: 567, itsOk: 234, youreDoingGreat: 123, youGotThis: 89 },
-    size: "sm" as const,
-  },
-  {
-    id: "6",
-    author: "Jordan Lee",
-    industry: "Academia",
-    content: "15th paper rejection this year. Reviewer said my methodology was 'fundamentally flawed' using the exact same approach that won an award last year. Peer review is chaos.",
-    tags: ["academia", "rejection", "imposter syndrome"],
-    timestamp: "3d ago",
-    reactions: { same: 345, itsOk: 189, youreDoingGreat: 267, youGotThis: 198 },
-    size: "md" as const,
-  },
-];
-
-const allTags = [
-  "rejection",
-  "job search",
-  "tech industry",
-  "freelancing",
-  "client work",
-  "creative block",
-  "startup failure",
-  "entrepreneurship",
-  "public speaking",
-  "embarrassing",
-  "academia",
-  "imposter syndrome",
-  "lessons learned",
 ];
 
 const Feed = () => {
-  const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const { user } = useAuth();
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [swipeDirection, setSwipeDirection] = useState(0);
+  const [showProfileDrawer, setShowProfileDrawer] = useState(false);
+  const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
+  const [touchEnd, setTouchEnd] = useState<{ x: number; y: number } | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  const filteredPosts = selectedTag
-    ? mockPosts.filter((post) => post.tags.includes(selectedTag))
-    : mockPosts;
+  // TODO: Replace with actual Supabase queries when posts table exists
+  const { data: allPosts = mockPosts, isLoading: postsLoading } = useQuery({
+    queryKey: ["posts"],
+    queryFn: async () => {
+      // Placeholder for future Supabase query
+      return mockPosts;
+    },
+  });
+
+  // Fetch profiles for each post author
+  const { data: profiles = [] } = useQuery({
+    queryKey: ["profiles"],
+    queryFn: async () => {
+      const { data } = await supabase.from("profiles").select("*");
+      return data || [];
+    },
+  });
+
+  const twoWeeksAgo = subWeeks(new Date(), 2);
+
+  // Filter posts based on visibility rules
+  const visiblePosts = allPosts.filter((post: any) => {
+    // For now, show all posts. In the future, filter by date and following
+    return true;
+  });
+
+  const currentPost = visiblePosts[currentIndex];
+  const currentPostProfile = profiles.find((p) => p.email === currentPost?.author_email);
+
+  const goNext = () => {
+    if (currentIndex < visiblePosts.length - 1) {
+      setSwipeDirection(1);
+      setCurrentIndex((prev) => prev + 1);
+      setShowProfileDrawer(false);
+    }
+  };
+
+  const goPrev = () => {
+    if (currentIndex > 0) {
+      setSwipeDirection(-1);
+      setCurrentIndex((prev) => prev - 1);
+      setShowProfileDrawer(false);
+    }
+  };
+
+  // Touch handlers for mobile swipe
+  const minSwipeDistance = 50;
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart({
+      x: e.targetTouches[0].clientX,
+      y: e.targetTouches[0].clientY,
+    });
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd({
+      x: e.targetTouches[0].clientX,
+      y: e.targetTouches[0].clientY,
+    });
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+
+    const distanceX = touchStart.x - touchEnd.x;
+    const distanceY = touchStart.y - touchEnd.y;
+    const isHorizontalSwipe = Math.abs(distanceX) > Math.abs(distanceY);
+
+    if (isHorizontalSwipe) {
+      if (distanceX > minSwipeDistance) goNext();
+      if (distanceX < -minSwipeDistance) goPrev();
+    } else {
+      if (distanceY > minSwipeDistance && !showProfileDrawer) {
+        setShowProfileDrawer(true);
+      }
+      if (distanceY < -minSwipeDistance && showProfileDrawer) {
+        setShowProfileDrawer(false);
+      }
+    }
+  };
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "ArrowRight") goNext();
+      if (e.key === "ArrowLeft") goPrev();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [currentIndex, visiblePosts.length]);
+
+  // Reset swipe direction after animation
+  useEffect(() => {
+    if (swipeDirection !== 0) {
+      const timer = setTimeout(() => setSwipeDirection(0), 300);
+      return () => clearTimeout(timer);
+    }
+  }, [swipeDirection]);
+
+  if (postsLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <main className="pt-24 pb-16 flex items-center justify-center min-h-[60vh]">
+          <div className="text-center">
+            <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto mb-4" />
+            <p className="text-muted-foreground font-semibold">Loading failures...</p>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (visiblePosts.length === 0) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <main className="pt-24 pb-16 flex items-center justify-center min-h-[60vh]">
+          <div className="text-center max-w-md">
+            <Sparkles className="w-16 h-16 mx-auto text-primary mb-4" />
+            <p className="font-bold text-2xl mb-2">No failures yet!</p>
+            <p className="text-lg text-muted-foreground mb-6">Be the first to share yours.</p>
+            {user && (
+              <Button size="lg" className="border-[3px] border-foreground shadow-brutal" onClick={() => setShowCreate(true)}>
+                <Plus className="mr-2" />
+                Share Failure
+              </Button>
+            )}
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
 
-      <main className="pt-24 pb-16">
-        <div className="container mx-auto px-4">
-          {/* Header */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-            <div>
-              <h1 className="text-3xl md:text-4xl font-bold">Your Feed</h1>
-              <p className="text-muted-foreground">
-                Where vulnerability meets community
-              </p>
-            </div>
-            <Button size="lg">
-              <Plus className="mr-2" /> Share a Failure
-            </Button>
-          </div>
+      {/* Desktop Layout */}
+      <div className="hidden md:flex h-[calc(100vh-64px)] px-4 pt-4">
+        {/* Left Arrow */}
+        <div className="flex items-center pr-4">
+          <button
+            onClick={goPrev}
+            disabled={currentIndex === 0}
+            className="p-3 bg-background border-[3px] border-foreground shadow-brutal hover:shadow-brutal-hover hover:translate-x-[2px] hover:translate-y-[2px] transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:translate-x-0 disabled:hover:translate-y-0 disabled:hover:shadow-brutal"
+          >
+            <ChevronLeft className="w-6 h-6" />
+          </button>
+        </div>
 
-          {/* Tags filter */}
-          <div className="mb-8 overflow-x-auto">
-            <div className="flex gap-2 pb-2">
-              <Button
-                variant={selectedTag === null ? "default" : "tag"}
-                size="tag"
-                onClick={() => setSelectedTag(null)}
+        {/* Main Content Area */}
+        <div className="flex-1 flex gap-6 py-6">
+          {/* Post Section - 65% */}
+          <div className="w-[65%] flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h1 className="font-bold text-3xl tracking-tight">The Feed</h1>
+                <p className="text-sm font-semibold text-muted-foreground font-mono">
+                  {currentIndex + 1} of {visiblePosts.length} failures
+                </p>
+              </div>
+            </div>
+
+            {/* Post Card with transition */}
+            <div className="flex-1 relative overflow-hidden">
+              <div
+                className="h-full transition-transform duration-300 ease-out"
+                style={{
+                  transform: swipeDirection === 1 
+                    ? "translateX(-20px) scale(0.98)" 
+                    : swipeDirection === -1 
+                    ? "translateX(20px) scale(0.98)" 
+                    : "translateX(0) scale(1)",
+                }}
               >
-                All
-              </Button>
-              {allTags.map((tag) => (
+                {currentPost && (
+                  <SwipePostCard post={currentPost} currentUserEmail={user?.email} comments={[]} />
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Profile Section - 35% */}
+          <div className="w-[35%] flex flex-col">
+            {/* Share button */}
+            <div className="flex justify-end mb-4">
+              {user && (
                 <Button
-                  key={tag}
-                  variant={selectedTag === tag ? "default" : "tag"}
-                  size="tag"
-                  onClick={() => setSelectedTag(tag)}
+                  onClick={() => setShowCreate(true)}
+                  className="border-[3px] border-foreground shadow-brutal"
                 >
-                  {tag}
+                  <Plus className="mr-2" />
+                  Share
                 </Button>
-              ))}
+              )}
+            </div>
+            {/* Profile Sidebar */}
+            <div className="flex-1">
+              <ProfileSidebar profile={currentPostProfile || null} post={currentPost || null} />
             </div>
           </div>
+        </div>
 
-          {/* Bento Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 auto-rows-auto">
-            {filteredPosts.map((post) => (
-              <FailurePost key={post.id} {...post} />
-            ))}
+        {/* Right Arrow */}
+        <div className="flex items-center pl-4">
+          <button
+            onClick={goNext}
+            disabled={currentIndex === visiblePosts.length - 1}
+            className="p-3 bg-background border-[3px] border-foreground shadow-brutal hover:shadow-brutal-hover hover:translate-x-[2px] hover:translate-y-[2px] transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:translate-x-0 disabled:hover:translate-y-0 disabled:hover:shadow-brutal"
+          >
+            <ChevronRight className="w-6 h-6" />
+          </button>
+        </div>
+      </div>
+
+      {/* Mobile Layout */}
+      <div
+        ref={containerRef}
+        className="md:hidden h-[calc(100vh-64px)] relative overflow-hidden"
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+      >
+        {/* Header */}
+        <div className="absolute top-0 left-0 right-0 z-10 p-4 flex items-center justify-between bg-gradient-to-b from-background via-background/95 to-transparent">
+          <div>
+            <h1 className="font-bold text-xl tracking-tight">The Feed</h1>
+            <p className="text-xs font-semibold text-muted-foreground font-mono">
+              {currentIndex + 1}/{visiblePosts.length}
+            </p>
           </div>
-
-          {filteredPosts.length === 0 && (
-            <div className="text-center py-16">
-              <p className="text-xl text-muted-foreground">
-                No failures found with this tag. That's suspicious... 🤔
-              </p>
-            </div>
+          {user && (
+            <Button
+              onClick={() => setShowCreate(true)}
+              size="sm"
+              className="border-[3px] border-foreground shadow-brutal"
+            >
+              <Plus className="w-4 h-4" />
+            </Button>
           )}
         </div>
-      </main>
+
+        {/* Post Card with Animation */}
+        <div className="h-full pt-20 pb-16 px-4 overflow-hidden">
+          <div
+            className="h-full transition-transform duration-300 ease-out"
+            style={{
+              transform: swipeDirection === 1 
+                ? "translateX(-20px) scale(0.98)" 
+                : swipeDirection === -1 
+                ? "translateX(20px) scale(0.98)" 
+                : "translateX(0) scale(1)",
+            }}
+          >
+            {currentPost && (
+              <SwipePostCard post={currentPost} currentUserEmail={user?.email} comments={[]} isMobile />
+            )}
+          </div>
+        </div>
+
+        {/* Swipe up hint */}
+        {!showProfileDrawer && (
+          <div className="absolute bottom-4 left-0 right-0 flex justify-center z-20">
+            <button
+              onClick={() => setShowProfileDrawer(true)}
+              className="flex flex-col items-center text-muted-foreground hover:text-foreground transition-colors animate-bounce"
+            >
+              <ChevronUp className="w-5 h-5" />
+              <span className="text-xs font-semibold">View Profile</span>
+            </button>
+          </div>
+        )}
+
+        {/* Mobile Profile Drawer */}
+        <MobileProfileDrawer
+          isOpen={showProfileDrawer}
+          onClose={() => setShowProfileDrawer(false)}
+          profile={currentPostProfile || null}
+          post={currentPost || null}
+        />
+      </div>
 
       <Footer />
     </div>
