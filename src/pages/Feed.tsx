@@ -248,7 +248,7 @@ const Feed = () => {
         <div className="flex-1 flex flex-col py-6">
           {/* Header */}
           <div className="flex items-center justify-between mb-4 px-0">
-            <h1 className="font-bold text-3xl tracking-tight">The Feed</h1>
+            <h1 className="font-bold text-3xl tracking-tight">Your Feed</h1>
             {user && (
               <Button
                 onClick={() => setShowCreate(true)}
@@ -310,7 +310,7 @@ const Feed = () => {
       >
         {/* Header */}
         <div className="absolute top-0 left-0 right-0 z-10 p-4 flex items-center justify-between bg-gradient-to-b from-background via-background/95 to-transparent pt-16">
-          <h1 className="font-bold text-xl tracking-tight">The Feed</h1>
+          <h1 className="font-bold text-xl tracking-tight">Your Feed</h1>
           {user && (
             <Button
               onClick={() => setShowCreate(true)}
