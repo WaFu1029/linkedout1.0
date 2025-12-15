@@ -25,7 +25,7 @@ export function Footer() {
           <div>
             <h4 className="font-bold mb-4 uppercase tracking-wide">Manifesto</h4>
             <p className="text-sm opacity-80">
-              Success is overrated. Here, we celebrate the stumbles, the rejections, and the beautiful mess of being human.
+              Success is overrated. Failure is human.
             </p>
           </div>
         </div>
