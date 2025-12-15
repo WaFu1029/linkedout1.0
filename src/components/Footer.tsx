@@ -14,7 +14,7 @@ export function Footer() {
               The anti-LinkedIn. Share your failures, embrace your vulnerabilities, and find community in imperfection.
             </p>
           </div>
-          <div>
+          <div>w
             <h4 className="font-bold mb-4 uppercase tracking-wide">Navigate</h4>
             <div className="space-y-2">
               <Link to="/feed" className="block hover:text-primary transition-colors">Feed</Link>

@@ -69,7 +69,7 @@ export function SwipePostCard({ post, currentUserEmail, comments = [], isMobile 
       )}
 
       {/* Content */}
-      <p className="font-medium text-xl leading-relaxed mb-5 flex-grow">{post.content}</p>
+      <p className="font-medium text-2xl leading-relaxed mb-5 flex-grow">{post.content}</p>
 
       {/* Tags */}
       {post.tags && post.tags.length > 0 && (
