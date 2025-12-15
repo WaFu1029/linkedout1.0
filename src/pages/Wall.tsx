@@ -115,6 +115,7 @@ const Wall = () => {
                 variant={selectedTag === null ? "default" : "tag"}
                 size="tag"
                 onClick={() => setSelectedTag(null)}
+                className={selectedTag === null ? "!shadow-none" : ""}
               >
                 All
               </Button>
@@ -124,6 +125,7 @@ const Wall = () => {
                   variant={selectedTag === tag ? "default" : "tag"}
                   size="tag"
                   onClick={() => setSelectedTag(tag)}
+                  className={selectedTag === tag ? "!shadow-none" : ""}
                 >
                   {tag}
                 </Button>
