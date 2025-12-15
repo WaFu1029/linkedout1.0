@@ -2,10 +2,12 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Menu, X } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const navigate = useNavigate();
+  const { user, signOut } = useAuth();
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-background">
@@ -24,12 +26,28 @@ export function Navbar() {
             <Link to="/wall" className="font-semibold hover:text-primary transition-colors">
               The Wall
             </Link>
-            <Button variant="outline" size="sm" onClick={() => navigate("/auth")}>
-              Sign In
-            </Button>
-            <Button size="sm" onClick={() => navigate("/auth?mode=signup")}>
-              Join Us
-            </Button>
+            {user ? (
+              <>
+                <Link to="/profile" className="font-semibold hover:text-primary transition-colors">
+                  Profile
+                </Link>
+                <Button variant="outline" size="sm" onClick={async () => {
+                  await signOut();
+                  navigate("/");
+                }}>
+                  Sign Out
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="outline" size="sm" onClick={() => navigate("/auth")}>
+                  Sign In
+                </Button>
+                <Button size="sm" onClick={() => navigate("/auth?mode=signup")}>
+                  Join Us
+                </Button>
+              </>
+            )}
           </div>
 
           {/* Mobile menu button */}
@@ -58,14 +76,37 @@ export function Navbar() {
             >
               The Wall
             </Link>
-            <div className="flex gap-2 pt-2">
-              <Button variant="outline" size="sm" onClick={() => { navigate("/auth"); setIsOpen(false); }}>
-                Sign In
-              </Button>
-              <Button size="sm" onClick={() => { navigate("/auth?mode=signup"); setIsOpen(false); }}>
-                Join Us
-              </Button>
-            </div>
+            {user ? (
+              <>
+                <Link
+                  to="/profile"
+                  className="block font-semibold hover:text-primary transition-colors"
+                  onClick={() => setIsOpen(false)}
+                >
+                  Profile
+                </Link>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={async () => { 
+                    await signOut(); 
+                    setIsOpen(false);
+                    navigate("/");
+                  }}
+                >
+                  Sign Out
+                </Button>
+              </>
+            ) : (
+              <div className="flex gap-2 pt-2">
+                <Button variant="outline" size="sm" onClick={() => { navigate("/auth"); setIsOpen(false); }}>
+                  Sign In
+                </Button>
+                <Button size="sm" onClick={() => { navigate("/auth?mode=signup"); setIsOpen(false); }}>
+                  Join Us
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </div>

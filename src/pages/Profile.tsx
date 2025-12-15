@@ -1,65 +1,227 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
-import { FailurePost } from "@/components/FailurePost";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
-import { Search, Plus, UserPlus } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { 
+  Loader2, 
+  Heart, 
+  Palette, 
+  UtensilsCrossed, 
+  Edit2, 
+  Save, 
+  X, 
+  Plus, 
+  Trash2, 
+  Quote 
+} from "lucide-react";
+import { FailurePost } from "@/components/FailurePost";
 
-// Mock user data
-const mockUser = {
-  name: "Jamie Chen",
-  industry: "Software Engineering",
-  hobbies: "Rock climbing, Board games, Photography",
-  favoriteFood: "Ramen (specifically tonkotsu)",
-  favoriteColor: "Forest green",
-  favoriteArtist: "Bon Iver",
-  favoriteSong: {
-    name: "Holocene",
-    artist: "Bon Iver",
-    album: "Bon Iver, Bon Iver",
-    releaseDate: "2011",
-  },
-};
-
-const mockUserPosts = [
-  {
-    id: "u1",
-    author: "Jamie Chen",
-    industry: "Software Engineering",
-    content: "Got rejected from my dream job at a FAANG company for the 4th time. They said I 'lacked leadership experience.' I've been leading a team of 8 for 2 years.",
-    tags: ["rejection", "job search", "tech industry"],
-    timestamp: "2h ago",
-    reactions: { same: 47, itsOk: 23, youreDoingGreat: 89, youGotThis: 156 },
-    size: "md" as const,
-  },
-  {
-    id: "u2",
-    author: "Jamie Chen",
-    industry: "Software Engineering",
-    content: "Deployed to production on a Friday. You know how this story ends. 3 hours of downtime and a lot of apologies.",
-    tags: ["coding", "embarrassing"],
-    timestamp: "1w ago",
-    reactions: { same: 234, itsOk: 89, youreDoingGreat: 45, youGotThis: 67 },
-    size: "sm" as const,
-  },
-  {
-    id: "u3",
-    author: "Jamie Chen",
-    industry: "Software Engineering",
-    content: "Spent 2 weeks on a feature that got cut in the next planning meeting. At least I learned a lot about WebSockets?",
-    tags: ["career", "lessons learned"],
-    timestamp: "2w ago",
-    reactions: { same: 156, itsOk: 67, youreDoingGreat: 123, youGotThis: 89 },
-    size: "sm" as const,
-  },
+const industries = [
+  "Software Engineering",
+  "Design",
+  "Marketing",
+  "Finance",
+  "Healthcare",
+  "Education",
+  "Freelance/Consulting",
+  "Startup Founder",
+  "Academia",
+  "Creative Arts",
+  "Other",
 ];
 
+interface Profile {
+  id: string;
+  email: string;
+  full_name: string | null;
+  industry: string | null;
+  favorite_food: string | null;
+  favorite_color: string | null;
+  favorite_artist: string | null;
+  hobbies: string[] | null;
+  motivational_quote: string | null;
+}
+
 const Profile = () => {
-  const [songSearch, setSongSearch] = useState("");
-  const [isEditing, setIsEditing] = useState(false);
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(false);
+  const [editData, setEditData] = useState({
+    industry: "",
+    favorite_food: "",
+    favorite_color: "",
+    favorite_artist: "",
+    hobbies: [] as string[],
+    motivational_quote: "",
+  });
+  const [newHobby, setNewHobby] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const isOwnProfile = !id || id === user?.id || user?.id === profile?.id;
+
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        setLoading(true);
+        const profileId = id || user?.id;
+
+        if (!profileId) {
+          if (user) {
+            // If logged in but no profile yet, create one
+            const { data: existingProfile } = await supabase
+              .from("profiles")
+              .select("*")
+              .eq("id", user.id)
+              .single();
+
+            if (!existingProfile) {
+              // Create a basic profile
+              const { data: newProfile } = await supabase
+                .from("profiles")
+                .insert({
+                  id: user.id,
+                  email: user.email,
+                  full_name: user.user_metadata?.full_name || user.email?.split("@")[0] || "User",
+                  industry: user.user_metadata?.industry || null,
+                })
+                .select()
+                .single();
+
+              if (newProfile) {
+                setProfile(newProfile);
+              }
+            } else {
+              setProfile(existingProfile);
+            }
+          } else {
+            navigate("/auth");
+          }
+          setLoading(false);
+          return;
+        }
+
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", profileId)
+          .single();
+
+        if (error) {
+          console.error("Error loading profile:", error);
+          toast.error("Failed to load profile");
+          if (isOwnProfile) {
+            navigate("/profile");
+          }
+        } else {
+          setProfile(data);
+        }
+      } catch (error) {
+        console.error("Error:", error);
+        toast.error("An error occurred");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadProfile();
+  }, [id, user, navigate, isOwnProfile]);
+
+  const startEditing = () => {
+    if (profile) {
+      setEditData({
+        industry: profile.industry || "",
+        favorite_food: profile.favorite_food || "",
+        favorite_color: profile.favorite_color || "",
+        favorite_artist: profile.favorite_artist || "",
+        hobbies: profile.hobbies || [],
+        motivational_quote: profile.motivational_quote || "",
+      });
+      setEditing(true);
+    }
+  };
+
+  const saveProfile = async () => {
+    if (!profile || !user) return;
+
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update(editData)
+        .eq("id", profile.id);
+
+      if (error) {
+        toast.error("Failed to update profile");
+        console.error(error);
+      } else {
+        setProfile({ ...profile, ...editData });
+        setEditing(false);
+        toast.success("Profile updated!");
+      }
+    } catch (error) {
+      toast.error("An error occurred");
+      console.error(error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const addHobby = () => {
+    if (newHobby.trim()) {
+      setEditData((prev) => ({
+        ...prev,
+        hobbies: [...(prev.hobbies || []), newHobby.trim()],
+      }));
+      setNewHobby("");
+    }
+  };
+
+  const removeHobby = (index: number) => {
+    setEditData((prev) => ({
+      ...prev,
+      hobbies: prev.hobbies.filter((_, i) => i !== index),
+    }));
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <main className="pt-24 pb-16 flex items-center justify-center min-h-[60vh]">
+          <div className="text-center">
+            <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto mb-4" />
+            <p className="text-muted-foreground font-semibold">Loading profile...</p>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <main className="pt-24 pb-16 flex items-center justify-center min-h-[60vh]">
+          <div className="text-center">
+            <p className="font-bold text-xl">Profile not found</p>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  const firstName = profile.full_name?.split(" ")[0] || profile.email?.split("@")[0] || "User";
 
   return (
     <div className="min-h-screen bg-background">
@@ -69,122 +231,214 @@ const Profile = () => {
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto">
             {/* Profile Header */}
-            <Card className="p-8 mb-8">
-              <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+            <Card className="border-[3px] border-foreground shadow-brutal p-6 md:p-8 mb-8">
+              <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-6">
                 <div>
-                  <h1 className="text-3xl md:text-4xl font-bold mb-2">{mockUser.name}</h1>
-                  <p className="text-lg text-muted-foreground font-mono">{mockUser.industry}</p>
+                  <h1 className="text-3xl md:text-4xl font-bold mb-2">{firstName}</h1>
+                  
+                  {editing ? (
+                    <div className="mt-3 max-w-xs">
+                      <select
+                        value={editData.industry}
+                        onChange={(e) => setEditData({ ...editData, industry: e.target.value })}
+                        className="flex h-11 w-full bg-cream-warm px-4 py-2 text-base font-medium border-[3px] border-foreground shadow-brutal transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                      >
+                        <option value="">Select your industry</option>
+                        {industries.map((ind) => (
+                          <option key={ind} value={ind}>
+                            {ind}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : (
+                    <p className="text-lg text-primary font-semibold font-mono mt-2">
+                      {profile.industry || "Human Being"}
+                    </p>
+                  )}
                 </div>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm">
-                    <UserPlus className="mr-2 h-4 w-4" /> Follow
-                  </Button>
-                  <Button size="sm" onClick={() => setIsEditing(!isEditing)}>
-                    {isEditing ? "Save Profile" : "Edit Profile"}
-                  </Button>
+
+                {isOwnProfile && (
+                  <div className="flex gap-2">
+                    {editing ? (
+                      <>
+                        <Button
+                          variant="outline"
+                          onClick={() => setEditing(false)}
+                          className="border-[3px] border-foreground"
+                        >
+                          <X className="w-4 h-4 mr-1" /> Cancel
+                        </Button>
+                        <Button
+                          onClick={saveProfile}
+                          disabled={saving}
+                          className="border-[3px] border-foreground shadow-brutal"
+                        >
+                          {saving ? (
+                            <Loader2 className="w-4 h-4 animate-spin mr-1" />
+                          ) : (
+                            <Save className="w-4 h-4 mr-1" />
+                          )}
+                          Save
+                        </Button>
+                      </>
+                    ) : (
+                      <Button
+                        onClick={startEditing}
+                        className="border-[3px] border-foreground shadow-brutal"
+                      >
+                        <Edit2 className="w-4 h-4 mr-1" /> Edit Profile
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Motivational Quote */}
+              <div className="mt-6 pt-6 border-t-[3px] border-dashed border-foreground">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center border-[3px] border-foreground">
+                    <Quote className="w-4 h-4 text-primary-foreground" />
+                  </div>
+                  <span className="font-bold text-sm uppercase tracking-wide">Favorite Motivational Quote</span>
+                </div>
+                
+                {editing ? (
+                  <textarea
+                    value={editData.motivational_quote}
+                    onChange={(e) => setEditData({ ...editData, motivational_quote: e.target.value })}
+                    placeholder="What quote motivates you?"
+                    className="flex min-h-[100px] w-full bg-cream-warm px-4 py-2 text-base font-medium border-[3px] border-foreground shadow-brutal transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 resize-none"
+                  />
+                ) : profile.motivational_quote ? (
+                  <div className="bg-secondary border-[3px] border-foreground shadow-brutal p-4">
+                    <p className="font-medium text-lg italic">
+                      "{profile.motivational_quote}"
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground italic">No quote added yet</p>
+                )}
+              </div>
+
+              {/* Hobbies */}
+              <div className="mt-6">
+                <span className="font-bold text-sm uppercase tracking-wide block mb-3">🎯 Hobbies</span>
+                
+                {editing ? (
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap gap-2">
+                      {editData.hobbies?.map((hobby, i) => (
+                        <span 
+                          key={i}
+                          className="bg-primary text-primary-foreground px-4 py-2 font-semibold border-[3px] border-foreground shadow-brutal flex items-center gap-2"
+                        >
+                          {hobby}
+                          <button 
+                            onClick={() => removeHobby(i)} 
+                            className="hover:text-destructive transition-colors"
+                            type="button"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                    <div className="flex gap-2 max-w-xs">
+                      <Input
+                        value={newHobby}
+                        onChange={(e) => setNewHobby(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addHobby())}
+                        placeholder="Add hobby..."
+                      />
+                      <Button 
+                        onClick={addHobby}
+                        className="border-[3px] border-foreground shadow-brutal"
+                        type="button"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {profile.hobbies && profile.hobbies.length > 0 ? (
+                      profile.hobbies.map((hobby, i) => (
+                        <span 
+                          key={i}
+                          className="bg-primary text-primary-foreground px-4 py-2 font-semibold border-[3px] border-foreground shadow-brutal"
+                        >
+                          {hobby}
+                        </span>
+                      ))
+                    ) : (
+                      <p className="text-muted-foreground italic">No hobbies listed</p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Favorites */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6">
+                <div className="flex items-center gap-3 bg-secondary p-4 border-[3px] border-foreground shadow-brutal">
+                  <UtensilsCrossed className="w-5 h-5 text-primary" />
+                  <div className="flex-grow">
+                    <span className="font-bold text-xs text-muted-foreground uppercase tracking-wide block">Favorite Food</span>
+                    {editing ? (
+                      <Input
+                        value={editData.favorite_food}
+                        onChange={(e) => setEditData({ ...editData, favorite_food: e.target.value })}
+                        className="mt-1 h-9"
+                      />
+                    ) : (
+                      <p className="font-semibold mt-1">{profile.favorite_food || "—"}</p>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-3 bg-secondary p-4 border-[3px] border-foreground shadow-brutal">
+                  <Palette className="w-5 h-5 text-primary" />
+                  <div className="flex-grow">
+                    <span className="font-bold text-xs text-muted-foreground uppercase tracking-wide block">Favorite Color</span>
+                    {editing ? (
+                      <Input
+                        value={editData.favorite_color}
+                        onChange={(e) => setEditData({ ...editData, favorite_color: e.target.value })}
+                        className="mt-1 h-9"
+                      />
+                    ) : (
+                      <p className="font-semibold mt-1">{profile.favorite_color || "—"}</p>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-3 bg-secondary p-4 border-[3px] border-foreground shadow-brutal">
+                  <Heart className="w-5 h-5 text-primary" />
+                  <div className="flex-grow">
+                    <span className="font-bold text-xs text-muted-foreground uppercase tracking-wide block">Favorite Artist</span>
+                    {editing ? (
+                      <Input
+                        value={editData.favorite_artist}
+                        onChange={(e) => setEditData({ ...editData, favorite_artist: e.target.value })}
+                        className="mt-1 h-9"
+                      />
+                    ) : (
+                      <p className="font-semibold mt-1">{profile.favorite_artist || "—"}</p>
+                    )}
+                  </div>
                 </div>
               </div>
             </Card>
 
-            {/* Profile Details Grid */}
-            <div className="grid md:grid-cols-2 gap-4 mb-8">
-              {/* Favorite Song - Last.fm Integration */}
-              <Card className="p-6">
-                <h3 className="font-bold uppercase tracking-wide text-sm mb-4">Favorite Song</h3>
-                {isEditing ? (
-                  <div className="space-y-3">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
-                      <Input
-                        placeholder="Search Last.fm..."
-                        value={songSearch}
-                        onChange={(e) => setSongSearch(e.target.value)}
-                        className="pl-10"
-                      />
-                    </div>
-                    <p className="text-xs text-muted-foreground">Search and select from Last.fm</p>
-                  </div>
-                ) : (
-                  <div className="space-y-1">
-                    <p className="font-bold text-lg">{mockUser.favoriteSong.name}</p>
-                    <p className="text-muted-foreground">{mockUser.favoriteSong.artist}</p>
-                    <p className="text-sm text-muted-foreground font-mono">
-                      {mockUser.favoriteSong.album} · {mockUser.favoriteSong.releaseDate}
-                    </p>
-                  </div>
-                )}
-              </Card>
-
-              {/* Hobbies */}
-              <Card className="p-6">
-                <h3 className="font-bold uppercase tracking-wide text-sm mb-4">Hobbies</h3>
-                {isEditing ? (
-                  <Input defaultValue={mockUser.hobbies} placeholder="What do you do for fun?" />
-                ) : (
-                  <p className="text-muted-foreground">{mockUser.hobbies}</p>
-                )}
-              </Card>
-
-              {/* Favorite Food */}
-              <Card className="p-6">
-                <h3 className="font-bold uppercase tracking-wide text-sm mb-4">Favorite Food</h3>
-                {isEditing ? (
-                  <Input defaultValue={mockUser.favoriteFood} placeholder="What's your comfort food?" />
-                ) : (
-                  <p className="text-muted-foreground">{mockUser.favoriteFood}</p>
-                )}
-              </Card>
-
-              {/* Favorite Color */}
-              <Card className="p-6">
-                <h3 className="font-bold uppercase tracking-wide text-sm mb-4">Favorite Color</h3>
-                {isEditing ? (
-                  <Input defaultValue={mockUser.favoriteColor} placeholder="What color speaks to you?" />
-                ) : (
-                  <p className="text-muted-foreground">{mockUser.favoriteColor}</p>
-                )}
+            {/* Posts Section - placeholder for now */}
+            <div className="mb-6">
+              <h2 className="font-bold text-2xl mb-4">My Failures</h2>
+              <Card className="border-[3px] border-foreground shadow-brutal p-8 text-center">
+                <p className="text-muted-foreground">
+                  Your failures will appear here once you start sharing.
+                </p>
               </Card>
             </div>
-
-            {/* Posts Section */}
-            <Tabs defaultValue="public" className="w-full">
-              <TabsList className="w-full border-[3px] border-foreground p-0 h-auto bg-background">
-                <TabsTrigger 
-                  value="public" 
-                  className="flex-1 py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold uppercase tracking-wide"
-                >
-                  Public Posts
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="archive" 
-                  className="flex-1 py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold uppercase tracking-wide"
-                >
-                  Your Archive
-                </TabsTrigger>
-              </TabsList>
-              <TabsContent value="public" className="mt-6">
-                <div className="grid md:grid-cols-2 gap-4">
-                  {mockUserPosts.map((post) => (
-                    <FailurePost key={post.id} {...post} size="sm" />
-                  ))}
-                </div>
-                <p className="text-center text-muted-foreground text-sm mt-6">
-                  Posts are visible for 2 weeks, then move to your private archive.
-                </p>
-              </TabsContent>
-              <TabsContent value="archive" className="mt-6">
-                <div className="text-center py-12 bg-secondary/50 border-[3px] border-dashed border-foreground">
-                  <p className="text-muted-foreground mb-4">
-                    Your complete failure archive lives here.
-                    <br />
-                    Only you can see posts older than 2 weeks.
-                  </p>
-                  <Button variant="outline">
-                    <Plus className="mr-2 h-4 w-4" /> Add a New Failure
-                  </Button>
-                </div>
-              </TabsContent>
-            </Tabs>
           </div>
         </div>
       </main>
