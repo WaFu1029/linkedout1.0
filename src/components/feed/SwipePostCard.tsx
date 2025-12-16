@@ -86,7 +86,17 @@ export function SwipePostCard({ post, currentUserEmail, comments = [], isMobile 
   }, [user, post.id]);
 
   const handleReaction = async (reactionType: 'like' | 'dislike') => {
-    if (!user || !post.id || isReacting) return;
+    if (!user) {
+      toast.error("Create an account to interact with other users", {
+        action: {
+          label: "Sign Up",
+          onClick: () => navigate("/auth?mode=signup"),
+        },
+      });
+      return;
+    }
+    
+    if (!post.id || isReacting) return;
 
     setIsReacting(true);
     try {
@@ -318,55 +328,56 @@ export function SwipePostCard({ post, currentUserEmail, comments = [], isMobile 
             <p className="text-sm text-muted-foreground italic">No comments yet</p>
           )}
 
-          {user ? (
-            <div className="flex gap-2 mt-3">
-              <Input
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                placeholder="3 words max..."
-                onKeyDown={(e) => e.key === "Enter" && handleComment()}
-                className="border-[3px] border-foreground"
-              />
-              <Button
-                onClick={handleComment}
-                disabled={wordCount === 0 || wordCount > 3}
-                className="border-[3px] border-foreground shadow-brutal"
-              >
-                Post
-              </Button>
-            </div>
-          ) : (
-            <div className="flex gap-2 mt-3">
-              <Input
-                value=""
-                placeholder="3 words max..."
-                disabled
-                className="border-[3px] border-foreground opacity-50 cursor-not-allowed"
-                onClick={() => {
+          <div className="flex gap-2 mt-3">
+            <Input
+              value={user ? newComment : ""}
+              onChange={(e) => {
+                if (!user) {
                   toast.error("Create an account to interact with other users", {
                     action: {
                       label: "Sign Up",
                       onClick: () => navigate("/auth?mode=signup"),
                     },
                   });
-                }}
-              />
-              <Button
-                onClick={() => {
+                  return;
+                }
+                setNewComment(e.target.value);
+              }}
+              placeholder="3 words max..."
+              onKeyDown={(e) => {
+                if (!user) {
+                  e.preventDefault();
                   toast.error("Create an account to interact with other users", {
                     action: {
                       label: "Sign Up",
                       onClick: () => navigate("/auth?mode=signup"),
                     },
                   });
-                }}
-                disabled
-                className="border-[3px] border-foreground shadow-brutal opacity-50 cursor-not-allowed"
-              >
-                Post
-              </Button>
-            </div>
-          )}
+                  return;
+                }
+                if (e.key === "Enter") handleComment();
+              }}
+              onClick={() => {
+                if (!user) {
+                  toast.error("Create an account to interact with other users", {
+                    action: {
+                      label: "Sign Up",
+                      onClick: () => navigate("/auth?mode=signup"),
+                    },
+                  });
+                }
+              }}
+              className={`border-[3px] border-foreground ${!user ? "opacity-50 cursor-not-allowed" : ""}`}
+              disabled={!user}
+            />
+            <Button
+              onClick={handleComment}
+              disabled={!user || wordCount === 0 || wordCount > 3}
+              className={`border-[3px] border-foreground shadow-brutal ${!user ? "opacity-50 cursor-not-allowed" : ""}`}
+            >
+              Post
+            </Button>
+          </div>
           {wordCount > 3 && (
             <p className="text-destructive text-xs font-bold mt-2">Max 3 words!</p>
           )}

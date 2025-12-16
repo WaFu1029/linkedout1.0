@@ -208,7 +208,6 @@ export function FailurePost({
           <h3 className="font-bold text-lg">{author}</h3>
           <p className="text-sm text-muted-foreground font-mono">{industry}</p>
         </div>
-        <span className="text-xs text-muted-foreground font-mono">{timestamp}</span>
       </div>
 
       {/* Title */}
@@ -227,6 +226,11 @@ export function FailurePost({
           </Badge>
         ))}
       </div>
+
+      {/* Timestamp */}
+      <p className="text-xs font-semibold text-muted-foreground mb-4 font-mono">
+        {timestamp}
+      </p>
 
       {/* Reactions */}
       <div className="flex flex-wrap gap-2 mb-3">
