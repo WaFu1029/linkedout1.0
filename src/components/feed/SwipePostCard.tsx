@@ -3,6 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { MessageCircle, ChevronDown, ChevronUp } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Reaction {
   same?: number;
@@ -38,14 +41,59 @@ const REACTIONS = [
 export function SwipePostCard({ post, currentUserEmail, comments = [], isMobile = false }: SwipePostCardProps) {
   const [showComments, setShowComments] = useState(false);
   const [newComment, setNewComment] = useState("");
+  const [isReacting, setIsReacting] = useState(false);
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   const reactions = post.reactions || {};
   const postComments = comments.filter((c) => c.id === post.id);
   const firstName = post.author?.split(" ")[0] || post.author;
 
-  const handleReaction = (reactionKey: keyof Reaction) => {
-    // TODO: Implement reaction logic with Supabase
-    console.log("Reaction:", reactionKey);
+  const handleReaction = async (reactionKey: keyof Reaction) => {
+    if (!user || !post.id || isReacting) return;
+
+    setIsReacting(true);
+    try {
+      // Check if user already has this reaction
+      const { data: existingReaction } = await supabase
+        .from("reactions")
+        .select("id")
+        .eq("post_id", post.id)
+        .eq("user_id", user.id)
+        .eq("reaction_type", reactionKey)
+        .single();
+
+      if (existingReaction) {
+        // Remove reaction
+        const { error } = await supabase
+          .from("reactions")
+          .delete()
+          .eq("post_id", post.id)
+          .eq("user_id", user.id)
+          .eq("reaction_type", reactionKey);
+
+        if (error) throw error;
+      } else {
+        // Add reaction
+        const { error } = await supabase
+          .from("reactions")
+          .insert({
+            post_id: post.id,
+            user_id: user.id,
+            reaction_type: reactionKey,
+          });
+
+        if (error) throw error;
+      }
+
+      // Invalidate queries to refresh reactions
+      queryClient.invalidateQueries({ queryKey: ["posts"] });
+      queryClient.invalidateQueries({ queryKey: ["profile-posts"] });
+    } catch (error) {
+      console.error("Error handling reaction:", error);
+    } finally {
+      setIsReacting(false);
+    }
   };
 
   const handleComment = () => {
@@ -98,7 +146,7 @@ export function SwipePostCard({ post, currentUserEmail, comments = [], isMobile 
             <button
               key={key}
               onClick={() => handleReaction(key)}
-              disabled={!currentUserEmail}
+              disabled={!user || isReacting}
               className="px-3 py-2 border-[3px] border-foreground font-semibold text-sm shadow-brutal hover:shadow-brutal-hover hover:translate-x-[2px] hover:translate-y-[2px] transition-all bg-background hover:bg-secondary disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span className="mr-1">{emoji}</span>

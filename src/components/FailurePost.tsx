@@ -1,6 +1,10 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/contexts/AuthContext";
+import { useState } from "react";
 
 interface FailurePostProps {
   id: string;
@@ -28,6 +32,7 @@ const sizeClasses = {
 };
 
 export function FailurePost({
+  id,
   author,
   industry,
   content,
@@ -37,6 +42,57 @@ export function FailurePost({
   comments = [],
   size = "sm",
 }: FailurePostProps) {
+  const [isReacting, setIsReacting] = useState(false);
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  const handleReaction = async (reactionType: "same" | "itsOk" | "youreDoingGreat" | "youGotThis") => {
+    if (!user || !id || isReacting) return;
+
+    setIsReacting(true);
+    try {
+      // Check if user already has this reaction
+      const { data: existingReaction } = await supabase
+        .from("reactions")
+        .select("id")
+        .eq("post_id", id)
+        .eq("user_id", user.id)
+        .eq("reaction_type", reactionType)
+        .single();
+
+      if (existingReaction) {
+        // Remove reaction
+        const { error } = await supabase
+          .from("reactions")
+          .delete()
+          .eq("post_id", id)
+          .eq("user_id", user.id)
+          .eq("reaction_type", reactionType);
+
+        if (error) throw error;
+      } else {
+        // Add reaction
+        const { error } = await supabase
+          .from("reactions")
+          .insert({
+            post_id: id,
+            user_id: user.id,
+            reaction_type: reactionType,
+          });
+
+        if (error) throw error;
+      }
+
+      // Invalidate queries to refresh reactions
+      queryClient.invalidateQueries({ queryKey: ["posts"] });
+      queryClient.invalidateQueries({ queryKey: ["profile-posts"] });
+    } catch (error) {
+      console.error("Error handling reaction:", error);
+    } finally {
+      setIsReacting(false);
+    }
+  };
+
   return (
     <Card
       className={`${sizeClasses[size]} p-5 flex flex-col hover:shadow-brutal-hover hover:translate-x-[2px] hover:translate-y-[2px] cursor-pointer`}
@@ -64,16 +120,36 @@ export function FailurePost({
 
       {/* Reactions */}
       <div className="flex flex-wrap gap-2 mb-3">
-        <Button variant="reaction" size="reaction">
+        <Button 
+          variant="reaction" 
+          size="reaction"
+          onClick={() => handleReaction("same")}
+          disabled={!user || isReacting}
+        >
           Same · {reactions.same}
         </Button>
-        <Button variant="reaction" size="reaction">
+        <Button 
+          variant="reaction" 
+          size="reaction"
+          onClick={() => handleReaction("itsOk")}
+          disabled={!user || isReacting}
+        >
           It's ok · {reactions.itsOk}
         </Button>
-        <Button variant="reaction" size="reaction">
+        <Button 
+          variant="reaction" 
+          size="reaction"
+          onClick={() => handleReaction("youreDoingGreat")}
+          disabled={!user || isReacting}
+        >
           You're doing great! · {reactions.youreDoingGreat}
         </Button>
-        <Button variant="reaction" size="reaction">
+        <Button 
+          variant="reaction" 
+          size="reaction"
+          onClick={() => handleReaction("youGotThis")}
+          disabled={!user || isReacting}
+        >
           You got this! · {reactions.youGotThis}
         </Button>
       </div>
