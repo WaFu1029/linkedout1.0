@@ -289,12 +289,12 @@ const Index = () => {
               )}
             </h1>
             <p className="text-xl md:text-2xl text-muted-foreground mb-10 max-w-2xl mx-auto animate-fade-in-up animation-delay-200">
-              A social platform where vulnerability is celebrated, rejection is relatable, and nobody pretends to have it all figured out.
+              A social platform we celebrate vulnerability, relate to rejection, and don't pretend to have it all figured out.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in-up animation-delay-300">
               <Button size="xl" asChild>
                 <Link to="/auth?mode=signup">
-                  Start Failing Together <ArrowRight className="ml-2" />
+                  Start Failing, Together <ArrowRight className="ml-2" />
                 </Link>
               </Button>
               <Button size="xl" variant="outline" asChild>
@@ -400,9 +400,6 @@ const Index = () => {
             <h2 className="text-3xl md:text-5xl font-bold mb-6">
               Ready to stop pretending?
             </h2>
-            <p className="text-xl opacity-90 mb-10">
-              Join a community where your failures are celebrated, your vulnerabilities are safe, and nobody's counting your followers.
-            </p>
             <Button
               size="xl"
               variant="outline"
