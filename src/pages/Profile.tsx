@@ -102,6 +102,8 @@ const Profile = () => {
   const [saving, setSaving] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
   const [isFollowingLoading, setIsFollowingLoading] = useState(false);
+  const [followerCount, setFollowerCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
 
   const isOwnProfile = !id || id === user?.id || user?.id === profile?.id;
   const profileId = id || user?.id || profile?.id;
@@ -185,7 +187,7 @@ const Profile = () => {
     enabled: !!profileId && !!profile,
   });
 
-  // Check if current user is following this profile
+  // Check if current user is following this profile and get follower/following counts
   useEffect(() => {
     const checkFollowing = async () => {
       if (!user || !profileId || isOwnProfile) {
@@ -193,6 +195,7 @@ const Profile = () => {
         return;
       }
 
+      // @ts-ignore - followers table types will be available after migration
       const { data } = await supabase
         .from("followers")
         .select("id")
@@ -203,8 +206,37 @@ const Profile = () => {
       setIsFollowing(!!data);
     };
 
+    const fetchFollowerCounts = async () => {
+      if (!profileId) return;
+
+      try {
+        // Get follower count (people following this profile)
+        // @ts-ignore - followers table types will be available after migration
+        const { count: followers } = await supabase
+          .from("followers")
+          .select("*", { count: "exact", head: true })
+          .eq("following_id", profileId);
+
+        // Get following count (people this profile follows)
+        // @ts-ignore - followers table types will be available after migration
+        const { count: following } = await supabase
+          .from("followers")
+          .select("*", { count: "exact", head: true })
+          .eq("follower_id", profileId);
+
+        setFollowerCount(followers || 0);
+        setFollowingCount(following || 0);
+      } catch (error) {
+        console.error("Error fetching follower counts:", error);
+      }
+    };
+
     if (profileId && user && !isOwnProfile) {
       checkFollowing();
+    }
+    
+    if (profileId) {
+      fetchFollowerCounts();
     }
   }, [profileId, user, isOwnProfile]);
 
@@ -449,7 +481,7 @@ const Profile = () => {
             {/* Profile Header */}
             <Card className="border-[3px] border-foreground shadow-brutal p-6 md:p-8 mb-8">
               <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-6">
-                <div>
+                <div className="flex-1">
                   <h1 className="text-3xl md:text-4xl font-bold mb-2">{firstName}</h1>
                   
                   {editing ? (
@@ -473,6 +505,28 @@ const Profile = () => {
                       {profile.industry || "Human Being"}
                     </p>
                   )}
+
+                  {/* Follower/Following Counts */}
+                  <div className="flex gap-4 mt-4">
+                    <button
+                      className="hover:text-primary transition-colors"
+                      onClick={() => {
+                        // TODO: Could navigate to a followers/following list page
+                      }}
+                    >
+                      <span className="font-bold text-lg">{followerCount}</span>
+                      <span className="text-sm text-muted-foreground ml-1">Followers</span>
+                    </button>
+                    <button
+                      className="hover:text-primary transition-colors"
+                      onClick={() => {
+                        // TODO: Could navigate to a followers/following list page
+                      }}
+                    >
+                      <span className="font-bold text-lg">{followingCount}</span>
+                      <span className="text-sm text-muted-foreground ml-1">Following</span>
+                    </button>
+                  </div>
                 </div>
 
                 <div className="flex gap-2">
