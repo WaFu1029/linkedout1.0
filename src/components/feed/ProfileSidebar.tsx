@@ -1,7 +1,11 @@
 import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Quote, ArrowRight, Heart } from "lucide-react";
+import { Quote, ArrowRight, Heart, UserPlus, UserMinus, Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 
 interface Profile {
   id?: string;
@@ -25,10 +29,82 @@ interface ProfileSidebarProps {
 }
 
 export function ProfileSidebar({ profile, post }: ProfileSidebarProps) {
+  const { user } = useAuth();
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [isFollowingLoading, setIsFollowingLoading] = useState(false);
+  const [isCheckingFollow, setIsCheckingFollow] = useState(true);
+
   if (!post) return null;
 
   const firstName = post.author?.split(" ")[0] || post.author || "User";
   const industry = profile?.industry || post.industry || "Human Being";
+  const profileId = profile?.id;
+  const isOwnProfile = user?.id === profileId;
+
+  // Check if current user is following this profile
+  useEffect(() => {
+    const checkFollowing = async () => {
+      if (!user || !profileId || isOwnProfile) {
+        setIsFollowing(false);
+        setIsCheckingFollow(false);
+        return;
+      }
+
+      try {
+        // @ts-ignore - followers table types will be available after migration
+        const { data } = await supabase.from("followers")
+          .select("id")
+          .eq("follower_id", user.id)
+          .eq("following_id", profileId)
+          .single();
+
+        setIsFollowing(!!data);
+      } catch (error) {
+        setIsFollowing(false);
+      } finally {
+        setIsCheckingFollow(false);
+      }
+    };
+
+    checkFollowing();
+  }, [profileId, user, isOwnProfile]);
+
+  const handleFollow = async () => {
+    if (!user || !profileId || isOwnProfile || isFollowingLoading) return;
+
+    setIsFollowingLoading(true);
+    try {
+      if (isFollowing) {
+        // Unfollow
+        // @ts-ignore - followers table types will be available after migration
+        const { error } = await supabase.from("followers")
+          .delete()
+          .eq("follower_id", user.id)
+          .eq("following_id", profileId);
+
+        if (error) throw error;
+        setIsFollowing(false);
+        toast.success("Unfollowed");
+      } else {
+        // Follow
+        // @ts-ignore - followers table types will be available after migration
+        const { error } = await (supabase as any).from("followers")
+          .insert({
+            follower_id: user.id,
+            following_id: profileId,
+          });
+
+        if (error) throw error;
+        setIsFollowing(true);
+        toast.success("Following");
+      }
+    } catch (error) {
+      console.error("Error following/unfollowing:", error);
+      toast.error("Failed to update follow status");
+    } finally {
+      setIsFollowingLoading(false);
+    }
+  };
 
   return (
     <Card className="h-full p-6 flex flex-col">
@@ -69,9 +145,34 @@ export function ProfileSidebar({ profile, post }: ProfileSidebarProps) {
         </div>
       )}
 
-      {/* View Full Profile Link */}
+      {/* Follow Button and View Full Profile Link */}
       {post.author_email && (
-        <div className="mt-auto">
+        <div className="mt-auto space-y-2">
+          {user && !isOwnProfile && profileId && (
+            <Button
+              onClick={handleFollow}
+              disabled={isFollowingLoading || isCheckingFollow}
+              variant={isFollowing ? "outline" : "default"}
+              className="w-full border-[3px] border-foreground shadow-brutal"
+            >
+              {isFollowingLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  {isFollowing ? "Unfollowing..." : "Following..."}
+                </>
+              ) : isFollowing ? (
+                <>
+                  <UserMinus className="w-4 h-4 mr-2" />
+                  Unfollow
+                </>
+              ) : (
+                <>
+                  <UserPlus className="w-4 h-4 mr-2" />
+                  Follow
+                </>
+              )}
+            </Button>
+          )}
           <Link to={`/profile/${profile?.id || post.author_email}`}>
             <Button
               variant="outline"
