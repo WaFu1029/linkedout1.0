@@ -8,6 +8,8 @@ import { Card } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useQuery } from "@tanstack/react-query";
+import { formatDistanceToNow } from "date-fns";
 import { 
   Loader2, 
   Heart, 
@@ -98,6 +100,87 @@ const Profile = () => {
   const [saving, setSaving] = useState(false);
 
   const isOwnProfile = !id || id === user?.id || user?.id === profile?.id;
+  const profileId = id || user?.id || profile?.id;
+
+  // Fetch posts for this profile
+  const { data: userPosts = [], isLoading: postsLoading } = useQuery({
+    queryKey: ["profile-posts", profileId],
+    queryFn: async () => {
+      if (!profileId) return [];
+      
+      const { data: postsData, error: postsError } = await supabase
+        .from("posts")
+        .select("*")
+        .eq("author_id", profileId)
+        .order("created_at", { ascending: false });
+
+      if (postsError) {
+        // If table doesn't exist yet, return empty array
+        if (postsError.code === "PGRST205" || postsError.message?.includes("Could not find the table")) {
+          return [];
+        }
+        console.error("Error fetching posts:", postsError);
+        return [];
+      }
+
+      if (!postsData || postsData.length === 0) {
+        return [];
+      }
+
+      // Fetch reactions for all posts
+      const postIds = postsData.map((p) => p.id);
+      const { data: reactionsData } = await supabase
+        .from("reactions")
+        .select("*")
+        .in("post_id", postIds);
+
+      // Group reactions by post
+      const reactionsByPost: Record<string, any> = {};
+      reactionsData?.forEach((reaction) => {
+        if (!reactionsByPost[reaction.post_id]) {
+          reactionsByPost[reaction.post_id] = {};
+        }
+        reactionsByPost[reaction.post_id][reaction.reaction_type] =
+          (reactionsByPost[reaction.post_id][reaction.reaction_type] || 0) + 1;
+      });
+
+      // Fetch comments for all posts
+      const { data: commentsData } = await supabase
+        .from("comments")
+        .select("*")
+        .in("post_id", postIds)
+        .order("created_at", { ascending: false });
+
+      // Group comments by post
+      const commentsByPost: Record<string, any[]> = {};
+      commentsData?.forEach((comment) => {
+        if (!commentsByPost[comment.post_id]) {
+          commentsByPost[comment.post_id] = [];
+        }
+        commentsByPost[comment.post_id].push({
+          text: comment.content,
+        });
+      });
+
+      // Transform posts to match FailurePost format
+      return postsData.map((post) => ({
+        id: post.id,
+        author: profile?.full_name || profile?.email?.split("@")[0] || "User",
+        industry: profile?.industry || "Human Being",
+        content: post.content,
+        tags: post.tags || [],
+        timestamp: formatDistanceToNow(new Date(post.created_at), { addSuffix: true }),
+        reactions: {
+          same: reactionsByPost[post.id]?.same || 0,
+          itsOk: reactionsByPost[post.id]?.itsOk || 0,
+          youreDoingGreat: reactionsByPost[post.id]?.youreDoingGreat || 0,
+          youGotThis: reactionsByPost[post.id]?.youGotThis || 0,
+        },
+        comments: commentsByPost[post.id] || [],
+      }));
+    },
+    enabled: !!profileId && !!profile,
+  });
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -507,15 +590,43 @@ const Profile = () => {
               </div>
             </Card>
 
-            {/* Posts Section - placeholder for now */}
+            {/* Posts Section */}
             <div className="mb-6">
-              <h2 className="font-bold text-2xl mb-4">My Failures</h2>
-              <Card className="border-[3px] border-foreground shadow-brutal p-8 text-center">
-                <p className="text-muted-foreground">
-                  Your failures will appear here once you start sharing.
-                </p>
-              </Card>
+              <h2 className="font-bold text-2xl mb-4">
+                {isOwnProfile ? "My Failures" : `${firstName}'s Failures`}
+              </h2>
+              {postsLoading ? (
+                <Card className="border-[3px] border-foreground shadow-brutal p-8 text-center">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-2" />
+                  <p className="text-muted-foreground">Loading failures...</p>
+                </Card>
+              ) : userPosts.length === 0 ? (
+                <Card className="border-[3px] border-foreground shadow-brutal p-8 text-center">
+                  <p className="text-muted-foreground">
+                    {isOwnProfile 
+                      ? "Your failures will appear here once you start sharing."
+                      : "No failures shared yet."}
+                  </p>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {userPosts.map((post) => (
+                    <FailurePost
+                      key={post.id}
+                      id={post.id}
+                      author={post.author}
+                      industry={post.industry}
+                      content={post.content}
+                      tags={post.tags}
+                      timestamp={post.timestamp}
+                      reactions={post.reactions}
+                      comments={post.comments}
+                      size="md"
+                    />
+                  ))}
                 </div>
+              )}
+            </div>
           </div>
         </div>
       </main>
