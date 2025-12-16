@@ -253,7 +253,6 @@ const Index = () => {
   const [showExplosion, setShowExplosion] = useState(false);
   const [showNewText, setShowNewText] = useState(false);
   const [hasTypedFirstText, setHasTypedFirstText] = useState(false);
-  const [showWhyText, setShowWhyText] = useState(false);
 
   return (
     <div className="min-h-screen bg-background">
@@ -271,8 +270,7 @@ const Index = () => {
     <TypingText 
       key="new-text"
       text={"Here's something that\nabsolutely flopped ..."} 
-      speed={50}
-      onComplete={() => setShowWhyText(true)}
+      speed={50} 
     />
   </span>
 ) : hasTypedFirstText ? (
@@ -301,15 +299,6 @@ const Index = () => {
                 </span>
               )}
             </h1>
-            {showWhyText && (
-              <div className="mb-6 min-h-[1.5em]">
-                <TypingText 
-                  key="why-text"
-                  text="Why? Because perfection is boring, and vulnerability is brave."
-                  speed={30}
-                />
-              </div>
-            )}
             <p className="text-xl md:text-2xl text-muted-foreground mb-10 max-w-2xl mx-auto animate-fade-in-up animation-delay-200">
               A social where we celebrate vulnerability, relate to rejection, and don't pretend to have it all figured out.
             </p>
@@ -325,6 +314,20 @@ const Index = () => {
                 </Link>
               </Button>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Why Section */}
+      <section className="py-16 md:py-24 bg-[#f97316]">
+        <div className="container mx-auto px-4">
+          <div className="max-w-3xl mx-auto text-left">
+            <h2 className="text-3xl md:text-4xl font-bold mb-6 text-background">
+              Why?
+            </h2>
+            <p className="text-lg md:text-xl text-background leading-relaxed">
+              Because perfection is boring, and vulnerability is brave. We're building a space where failures aren't hidden—they're shared, celebrated, and learned from. No more pretending to have it all figured out.
+            </p>
           </div>
         </div>
       </section>
