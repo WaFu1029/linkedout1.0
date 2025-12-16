@@ -353,16 +353,13 @@ const Index = () => {
       {/* Why Section */}
       <section className="py-16 md:py-24 bg-[#f97316]">
         <div className="container mx-auto px-4">
-          <div className="max-w-3xl mx-auto text-left">
-            <h2 className="text-3xl md:text-4xl font-bold mb-6 text-background">
+          <div className="max-w-3xl text-left pl-4 md:pl-8">
+            <h2 className="text-3xl md:text-4xl font-bold mb-8 text-background">
               Why?
             </h2>
-            <p className="text-lg md:text-xl text-background leading-relaxed mb-8">
-              Because perfection is boring, and vulnerability is brave. We're building a space where failures aren't hidden—they're shared, celebrated, and learned from. No more pretending to have it all figured out.
-            </p>
             
             {/* Chart */}
-            <div className="mt-8 max-w-2xl">
+            <div className="max-w-2xl">
               <ChartContainer config={chartConfig} className="h-[250px] w-full">
                 <BarChart
                   data={chartData}
