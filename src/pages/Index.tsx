@@ -253,6 +253,7 @@ const Index = () => {
   const [showExplosion, setShowExplosion] = useState(false);
   const [showNewText, setShowNewText] = useState(false);
   const [hasTypedFirstText, setHasTypedFirstText] = useState(false);
+  const [showWhyText, setShowWhyText] = useState(false);
 
   return (
     <div className="min-h-screen bg-background">
@@ -270,7 +271,8 @@ const Index = () => {
     <TypingText 
       key="new-text"
       text={"Here's something that\nabsolutely flopped ..."} 
-      speed={50} 
+      speed={50}
+      onComplete={() => setShowWhyText(true)}
     />
   </span>
 ) : hasTypedFirstText ? (
@@ -299,6 +301,15 @@ const Index = () => {
                 </span>
               )}
             </h1>
+            {showWhyText && (
+              <div className="mb-6 min-h-[1.5em]">
+                <TypingText 
+                  key="why-text"
+                  text="Why? Because perfection is boring, and vulnerability is brave."
+                  speed={30}
+                />
+              </div>
+            )}
             <p className="text-xl md:text-2xl text-muted-foreground mb-10 max-w-2xl mx-auto animate-fade-in-up animation-delay-200">
               A social where we celebrate vulnerability, relate to rejection, and don't pretend to have it all figured out.
             </p>
