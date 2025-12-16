@@ -359,11 +359,13 @@ const Index = () => {
             </h2>
             
             {/* Chart */}
-            <div className="max-w-2xl">
+            <div className="max-w-4xl">
               <h3 className="text-xl md:text-2xl font-bold mb-4 text-background">
                 The Effects of Social Media on Mental Health
               </h3>
-              <ChartContainer config={chartConfig} className="h-[400px] w-full">
+              <div className="flex flex-col md:flex-row gap-6 items-start">
+                <div className="flex-1">
+                  <ChartContainer config={chartConfig} className="h-[400px] w-full [&_.recharts-cartesian-axis-tick_text]:fill-white">
                 <BarChart
                   data={chartData}
                   margin={{
@@ -389,8 +391,14 @@ const Index = () => {
                     tickMargin={8}
                     tick={{ fill: "#ffffff", fontSize: 12 }}
                     domain={[0, 50]}
-                    label={{ value: "%", position: "insideLeft", fill: "#ffffff", style: { textAnchor: "middle" } }}
-                    width={40}
+                    label={{ 
+                      value: "Percentage of Users", 
+                      angle: -90, 
+                      position: "insideLeft", 
+                      fill: "#ffffff",
+                      style: { textAnchor: "middle" }
+                    }}
+                    width={80}
                   />
                   <ChartTooltip
                     cursor={false}
@@ -404,11 +412,30 @@ const Index = () => {
                   />
                   <Bar
                     dataKey="percentage"
-                    fill="var(--color-percentage)"
+                    fill="#ffffff"
                     radius={[4, 4, 0, 0]}
+                    label={{ 
+                      position: "center", 
+                      fill: "#f97316", 
+                      fontSize: 20, 
+                      fontWeight: "bold",
+                      formatter: (value: number) => `${value}%`
+                    }}
                   />
                 </BarChart>
               </ChartContainer>
+                </div>
+                
+                {/* Stats Square */}
+                <div className="border-[3px] border-background bg-white p-6 md:p-8 flex flex-col items-center justify-center min-w-[200px] md:min-w-[250px]">
+                  <div className="text-6xl md:text-7xl font-bold text-[#f97316] mb-4">
+                    67%
+                  </div>
+                  <p className="text-sm md:text-base text-foreground text-center leading-relaxed">
+                    Studies with significant SM–mental health link. Proportion of adult studies in global meta‑analysis (2010–2020).
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
