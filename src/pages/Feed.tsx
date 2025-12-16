@@ -21,7 +21,7 @@ const mockPosts = [
     content: "Got rejected from my dream job at a FAANG company for the 4th time. They said I 'lacked leadership experience.' I've been leading a team of 8 for 2 years. Sometimes the answer is just no, and that's okay.",
     tags: ["rejection", "job search", "tech industry"],
     timestamp: "2h ago",
-    reactions: { same: 47, itsOk: 23, youreDoingGreat: 89, youGotThis: 156 },
+    reactions: { like: 245, dislike: 12 },
     author_email: "jamie@example.com",
   },
   {
@@ -31,7 +31,7 @@ const mockPosts = [
     content: "Lost a client because I was 'too honest' about timeline estimates. Apparently they wanted me to lie?",
     tags: ["freelancing", "client work"],
     timestamp: "5h ago",
-    reactions: { same: 234, itsOk: 45, youreDoingGreat: 67, youGotThis: 89 },
+    reactions: { like: 435, dislike: 8 },
     author_email: "marcus@example.com",
   },
   {
@@ -41,7 +41,7 @@ const mockPosts = [
     content: "Pitched a campaign I spent 3 weeks on. Client chose the competitor's idea which was literally just 'make it pop.' I need a drink.",
     tags: ["creative block", "client work", "rejection"],
     timestamp: "8h ago",
-    reactions: { same: 189, itsOk: 78, youreDoingGreat: 234, youGotThis: 167 },
+    reactions: { like: 668, dislike: 15 },
     author_email: "priya@example.com",
   },
   {
@@ -51,7 +51,7 @@ const mockPosts = [
     content: "My startup failed after 3 years. We raised $2M, hired 15 people, and ultimately couldn't find product-market fit. I learned more from this failure than any success. Now I'm figuring out what's next.",
     tags: ["startup failure", "entrepreneurship", "lessons learned"],
     timestamp: "1d ago",
-    reactions: { same: 89, itsOk: 156, youreDoingGreat: 423, youGotThis: 534 },
+    reactions: { like: 1202, dislike: 23 },
     author_email: "alex@example.com",
   },
 ];
@@ -99,13 +99,16 @@ const Feed = () => {
         .in("post_id", postIds);
 
       // Group reactions by post
-      const reactionsByPost: Record<string, any> = {};
+      const reactionsByPost: Record<string, { like: number; dislike: number }> = {};
       reactionsData?.forEach((reaction) => {
         if (!reactionsByPost[reaction.post_id]) {
-          reactionsByPost[reaction.post_id] = {};
+          reactionsByPost[reaction.post_id] = { like: 0, dislike: 0 };
         }
-        reactionsByPost[reaction.post_id][reaction.reaction_type] =
-          (reactionsByPost[reaction.post_id][reaction.reaction_type] || 0) + 1;
+        if (reaction.reaction_type === 'like') {
+          reactionsByPost[reaction.post_id].like += 1;
+        } else if (reaction.reaction_type === 'dislike') {
+          reactionsByPost[reaction.post_id].dislike += 1;
+        }
       });
 
       // Fetch profiles to get author info

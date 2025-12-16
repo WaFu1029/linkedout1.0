@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "next-themes";
+import { ThumbsUp, ThumbsDown } from "lucide-react";
 import { useState, useEffect } from "react";
 
 interface FailurePostProps {
@@ -15,10 +16,8 @@ interface FailurePostProps {
   tags: string[];
   timestamp: string;
   reactions: {
-    same: number;
-    itsOk: number;
-    youreDoingGreat: number;
-    youGotThis: number;
+    like: number;
+    dislike: number;
   };
   comments?: { text: string }[];
   size?: "sm" | "md" | "lg" | "tall" | "wide";
@@ -44,57 +43,71 @@ export function FailurePost({
   size = "sm",
 }: FailurePostProps) {
   const [isReacting, setIsReacting] = useState(false);
-  const [userReactions, setUserReactions] = useState<Set<string>>(new Set());
+  const [userReaction, setUserReaction] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
 
-  // Fetch user's reactions for this post
+  // Fetch user's reaction for this post
   useEffect(() => {
-    const fetchUserReactions = async () => {
+    const fetchUserReaction = async () => {
       if (!user || !id) return;
       
       const { data } = await supabase
         .from("reactions")
         .select("reaction_type")
         .eq("post_id", id)
-        .eq("user_id", user.id);
+        .eq("user_id", user.id)
+        .single();
 
       if (data) {
-        setUserReactions(new Set(data.map((r) => r.reaction_type)));
+        setUserReaction(data.reaction_type);
+      } else {
+        setUserReaction(null);
       }
     };
 
-    fetchUserReactions();
+    fetchUserReaction();
   }, [user, id]);
 
-  const handleReaction = async (reactionType: "same" | "itsOk" | "youreDoingGreat" | "youGotThis") => {
+  const handleReaction = async (reactionType: 'like' | 'dislike') => {
     if (!user || !id || isReacting) return;
 
     setIsReacting(true);
     try {
-      // Check if user already has this reaction
+      // Check if user already has a reaction
       const { data: existingReaction } = await supabase
         .from("reactions")
-        .select("id")
+        .select("id, reaction_type")
         .eq("post_id", id)
         .eq("user_id", user.id)
-        .eq("reaction_type", reactionType)
         .single();
 
       if (existingReaction) {
-        // Remove reaction
-        const { error } = await supabase
-          .from("reactions")
-          .delete()
-          .eq("post_id", id)
-          .eq("user_id", user.id)
-          .eq("reaction_type", reactionType);
+        if (existingReaction.reaction_type === reactionType) {
+          // Remove reaction if clicking the same one
+          const { error } = await supabase
+            .from("reactions")
+            .delete()
+            .eq("post_id", id)
+            .eq("user_id", user.id);
 
-        if (error) throw error;
+          if (error) throw error;
+          setUserReaction(null);
+        } else {
+          // Replace reaction if clicking different one
+          const { error } = await supabase
+            .from("reactions")
+            .update({ reaction_type: reactionType })
+            .eq("post_id", id)
+            .eq("user_id", user.id);
+
+          if (error) throw error;
+          setUserReaction(reactionType);
+        }
       } else {
-        // Add reaction
+        // Add new reaction
         const { error } = await supabase
           .from("reactions")
           .insert({
@@ -104,16 +117,8 @@ export function FailurePost({
           });
 
         if (error) throw error;
+        setUserReaction(reactionType);
       }
-
-      // Update local state immediately for visual feedback
-      const newUserReactions = new Set(userReactions);
-      if (existingReaction) {
-        newUserReactions.delete(reactionType);
-      } else {
-        newUserReactions.add(reactionType);
-      }
-      setUserReactions(newUserReactions);
 
       // Invalidate queries to refresh reactions
       queryClient.invalidateQueries({ queryKey: ["posts"] });
@@ -155,38 +160,22 @@ export function FailurePost({
         <Button 
           variant="reaction" 
           size="reaction"
-          onClick={() => handleReaction("same")}
+          onClick={() => handleReaction("like")}
           disabled={!user || isReacting}
-          className={userReactions.has("same") ? isDark ? "bg-[#a78bfa] text-white hover:bg-[#8b5cf6]" : "bg-[#f97316] text-white hover:bg-[#ea580c]" : ""}
+          className={`flex items-center gap-2 ${userReaction === "like" ? isDark ? "bg-[#a78bfa] text-white hover:bg-[#8b5cf6]" : "bg-[#f97316] text-white hover:bg-[#ea580c]" : ""}`}
         >
-          Same · {reactions.same}
+          <ThumbsUp className="w-4 h-4" />
+          Like · {reactions.like || 0}
         </Button>
         <Button 
           variant="reaction" 
           size="reaction"
-          onClick={() => handleReaction("itsOk")}
+          onClick={() => handleReaction("dislike")}
           disabled={!user || isReacting}
-          className={userReactions.has("itsOk") ? isDark ? "bg-[#a78bfa] text-white hover:bg-[#8b5cf6]" : "bg-[#f97316] text-white hover:bg-[#ea580c]" : ""}
+          className={`flex items-center gap-2 ${userReaction === "dislike" ? isDark ? "bg-[#a78bfa] text-white hover:bg-[#8b5cf6]" : "bg-[#f97316] text-white hover:bg-[#ea580c]" : ""}`}
         >
-          It's ok · {reactions.itsOk}
-        </Button>
-        <Button 
-          variant="reaction" 
-          size="reaction"
-          onClick={() => handleReaction("youreDoingGreat")}
-          disabled={!user || isReacting}
-          className={userReactions.has("youreDoingGreat") ? isDark ? "bg-[#a78bfa] text-white hover:bg-[#8b5cf6]" : "bg-[#f97316] text-white hover:bg-[#ea580c]" : ""}
-        >
-          You're doing great! · {reactions.youreDoingGreat}
-        </Button>
-        <Button 
-          variant="reaction" 
-          size="reaction"
-          onClick={() => handleReaction("youGotThis")}
-          disabled={!user || isReacting}
-          className={userReactions.has("youGotThis") ? isDark ? "bg-[#a78bfa] text-white hover:bg-[#8b5cf6]" : "bg-[#f97316] text-white hover:bg-[#ea580c]" : ""}
-        >
-          You got this! · {reactions.youGotThis}
+          <ThumbsDown className="w-4 h-4" />
+          Dislike · {reactions.dislike || 0}
         </Button>
       </div>
 

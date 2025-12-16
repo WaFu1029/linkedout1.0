@@ -22,7 +22,9 @@ import {
   Trash2, 
   Quote,
   Sparkles,
-  ChevronDown
+  ChevronDown,
+  UserPlus,
+  UserMinus
 } from "lucide-react";
 import { FailurePost } from "@/components/FailurePost";
 
@@ -98,6 +100,8 @@ const Profile = () => {
   });
   const [newHobby, setNewHobby] = useState("");
   const [saving, setSaving] = useState(false);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [isFollowingLoading, setIsFollowingLoading] = useState(false);
 
   const isOwnProfile = !id || id === user?.id || user?.id === profile?.id;
   const profileId = id || user?.id || profile?.id;
@@ -135,13 +139,16 @@ const Profile = () => {
         .in("post_id", postIds);
 
       // Group reactions by post
-      const reactionsByPost: Record<string, any> = {};
+      const reactionsByPost: Record<string, { like: number; dislike: number }> = {};
       reactionsData?.forEach((reaction) => {
         if (!reactionsByPost[reaction.post_id]) {
-          reactionsByPost[reaction.post_id] = {};
+          reactionsByPost[reaction.post_id] = { like: 0, dislike: 0 };
         }
-        reactionsByPost[reaction.post_id][reaction.reaction_type] =
-          (reactionsByPost[reaction.post_id][reaction.reaction_type] || 0) + 1;
+        if (reaction.reaction_type === 'like') {
+          reactionsByPost[reaction.post_id].like += 1;
+        } else if (reaction.reaction_type === 'dislike') {
+          reactionsByPost[reaction.post_id].dislike += 1;
+        }
       });
 
       // Fetch comments for all posts
@@ -170,17 +177,35 @@ const Profile = () => {
         content: post.content,
         tags: post.tags || [],
         timestamp: formatDistanceToNow(new Date(post.created_at), { addSuffix: true }),
-        reactions: {
-          same: reactionsByPost[post.id]?.same || 0,
-          itsOk: reactionsByPost[post.id]?.itsOk || 0,
-          youreDoingGreat: reactionsByPost[post.id]?.youreDoingGreat || 0,
-          youGotThis: reactionsByPost[post.id]?.youGotThis || 0,
-        },
+        reactions: reactionsByPost[post.id] || { like: 0, dislike: 0 },
         comments: commentsByPost[post.id] || [],
       }));
     },
     enabled: !!profileId && !!profile,
   });
+
+  // Check if current user is following this profile
+  useEffect(() => {
+    const checkFollowing = async () => {
+      if (!user || !profileId || isOwnProfile) {
+        setIsFollowing(false);
+        return;
+      }
+
+      const { data } = await supabase
+        .from("followers")
+        .select("id")
+        .eq("follower_id", user.id)
+        .eq("following_id", profileId)
+        .single();
+
+      setIsFollowing(!!data);
+    };
+
+    if (profileId && user && !isOwnProfile) {
+      checkFollowing();
+    }
+  }, [profileId, user, isOwnProfile]);
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -339,6 +364,43 @@ const Profile = () => {
     }));
   };
 
+  const handleFollow = async () => {
+    if (!user || !profileId || isOwnProfile || isFollowingLoading) return;
+
+    setIsFollowingLoading(true);
+    try {
+      if (isFollowing) {
+        // Unfollow
+        const { error } = await supabase
+          .from("followers")
+          .delete()
+          .eq("follower_id", user.id)
+          .eq("following_id", profileId);
+
+        if (error) throw error;
+        setIsFollowing(false);
+        toast.success("Unfollowed");
+      } else {
+        // Follow
+        const { error } = await supabase
+          .from("followers")
+          .insert({
+            follower_id: user.id,
+            following_id: profileId,
+          });
+
+        if (error) throw error;
+        setIsFollowing(true);
+        toast.success("Following");
+      }
+    } catch (error) {
+      console.error("Error following/unfollowing:", error);
+      toast.error("Failed to update follow status");
+    } finally {
+      setIsFollowingLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
@@ -412,40 +474,61 @@ const Profile = () => {
                   )}
                 </div>
 
-                {isOwnProfile && (
                 <div className="flex gap-2">
-                    {editing ? (
-                      <>
+                  {isOwnProfile ? (
+                    <>
+                      {editing ? (
+                        <>
+                          <Button
+                            variant="outline"
+                            onClick={() => setEditing(false)}
+                            className="border-[3px] border-foreground"
+                          >
+                            <X className="w-4 h-4 mr-1" /> Cancel
+                          </Button>
+                          <Button
+                            onClick={saveProfile}
+                            disabled={saving}
+                            className="border-[3px] border-foreground"
+                          >
+                            {saving ? (
+                              <Loader2 className="w-4 h-4 animate-spin mr-1" />
+                            ) : (
+                              <Save className="w-4 h-4 mr-1" />
+                            )}
+                            Save
+                          </Button>
+                        </>
+                      ) : (
                         <Button
-                          variant="outline"
-                          onClick={() => setEditing(false)}
+                          onClick={startEditing}
                           className="border-[3px] border-foreground"
                         >
-                          <X className="w-4 h-4 mr-1" /> Cancel
+                          <Edit2 className="w-4 h-4 mr-1" /> Edit Profile
                         </Button>
-                        <Button
-                          onClick={saveProfile}
-                          disabled={saving}
-                          className="border-[3px] border-foreground"
-                        >
-                          {saving ? (
-                            <Loader2 className="w-4 h-4 animate-spin mr-1" />
-                          ) : (
-                            <Save className="w-4 h-4 mr-1" />
-                          )}
-                          Save
-                  </Button>
-                      </>
-                    ) : (
-                      <Button
-                        onClick={startEditing}
-                        className="border-[3px] border-foreground"
-                      >
-                        <Edit2 className="w-4 h-4 mr-1" /> Edit Profile
-                  </Button>
-                    )}
-                  </div>
-                )}
+                      )}
+                    </>
+                  ) : user && (
+                    <Button
+                      onClick={handleFollow}
+                      disabled={isFollowingLoading}
+                      variant={isFollowing ? "outline" : "default"}
+                      className="border-[3px] border-foreground"
+                    >
+                      {isFollowingLoading ? (
+                        <Loader2 className="w-4 h-4 animate-spin mr-1" />
+                      ) : isFollowing ? (
+                        <>
+                          <UserMinus className="w-4 h-4 mr-1" /> Unfollow
+                        </>
+                      ) : (
+                        <>
+                          <UserPlus className="w-4 h-4 mr-1" /> Follow
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </div>
               </div>
 
               {/* Motivational Quote */}

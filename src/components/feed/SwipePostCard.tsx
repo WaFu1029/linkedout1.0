@@ -2,17 +2,15 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { MessageCircle, ChevronDown, ChevronUp } from "lucide-react";
+import { MessageCircle, ChevronDown, ChevronUp, ThumbsUp, ThumbsDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "next-themes";
 
 interface Reaction {
-  same?: number;
-  itsOk?: number;
-  youreDoingGreat?: number;
-  youGotThis?: number;
+  like?: number;
+  dislike?: number;
 }
 
 interface Post {
@@ -32,91 +30,90 @@ interface SwipePostCardProps {
   isMobile?: boolean;
 }
 
-const REACTIONS = [
-  { key: "same" as const, label: "Same", emoji: "🫠" },
-  { key: "itsOk" as const, label: "It's ok", emoji: "👍" },
-  { key: "youreDoingGreat" as const, label: "You're doing great!", emoji: "💪" },
-  { key: "youGotThis" as const, label: "You got this!", emoji: "🔥" },
-];
-
 export function SwipePostCard({ post, currentUserEmail, comments = [], isMobile = false }: SwipePostCardProps) {
   const [showComments, setShowComments] = useState(false);
   const [newComment, setNewComment] = useState("");
   const [isReacting, setIsReacting] = useState(false);
-  const [userReactions, setUserReactions] = useState<Set<string>>(new Set());
+  const [userReaction, setUserReaction] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
 
-  const reactions = post.reactions || {};
+  const reactions = post.reactions || { like: 0, dislike: 0 };
   const postComments = comments.filter((c) => c.id === post.id);
   const firstName = post.author?.split(" ")[0] || post.author;
 
-  // Fetch user's reactions for this post
+  // Fetch user's reaction for this post
   useEffect(() => {
-    const fetchUserReactions = async () => {
+    const fetchUserReaction = async () => {
       if (!user || !post.id) return;
       
       const { data } = await supabase
         .from("reactions")
         .select("reaction_type")
         .eq("post_id", post.id)
-        .eq("user_id", user.id);
+        .eq("user_id", user.id)
+        .single();
 
       if (data) {
-        setUserReactions(new Set(data.map((r) => r.reaction_type)));
+        setUserReaction(data.reaction_type);
+      } else {
+        setUserReaction(null);
       }
     };
 
-    fetchUserReactions();
+    fetchUserReaction();
   }, [user, post.id]);
 
-  const handleReaction = async (reactionKey: keyof Reaction) => {
+  const handleReaction = async (reactionType: 'like' | 'dislike') => {
     if (!user || !post.id || isReacting) return;
 
     setIsReacting(true);
     try {
-      // Check if user already has this reaction
+      // Check if user already has a reaction
       const { data: existingReaction } = await supabase
         .from("reactions")
-        .select("id")
+        .select("id, reaction_type")
         .eq("post_id", post.id)
         .eq("user_id", user.id)
-        .eq("reaction_type", reactionKey)
         .single();
 
       if (existingReaction) {
-        // Remove reaction
-        const { error } = await supabase
-          .from("reactions")
-          .delete()
-          .eq("post_id", post.id)
-          .eq("user_id", user.id)
-          .eq("reaction_type", reactionKey);
+        if (existingReaction.reaction_type === reactionType) {
+          // Remove reaction if clicking the same one
+          const { error } = await supabase
+            .from("reactions")
+            .delete()
+            .eq("post_id", post.id)
+            .eq("user_id", user.id);
 
-        if (error) throw error;
+          if (error) throw error;
+          setUserReaction(null);
+        } else {
+          // Replace reaction if clicking different one
+          const { error } = await supabase
+            .from("reactions")
+            .update({ reaction_type: reactionType })
+            .eq("post_id", post.id)
+            .eq("user_id", user.id);
+
+          if (error) throw error;
+          setUserReaction(reactionType);
+        }
       } else {
-        // Add reaction
+        // Add new reaction
         const { error } = await supabase
           .from("reactions")
           .insert({
             post_id: post.id,
             user_id: user.id,
-            reaction_type: reactionKey,
+            reaction_type: reactionType,
           });
 
         if (error) throw error;
+        setUserReaction(reactionType);
       }
-
-      // Update local state immediately for visual feedback
-      const newUserReactions = new Set(userReactions);
-      if (existingReaction) {
-        newUserReactions.delete(reactionKey);
-      } else {
-        newUserReactions.add(reactionKey);
-      }
-      setUserReactions(newUserReactions);
 
       // Invalidate queries to refresh reactions
       queryClient.invalidateQueries({ queryKey: ["posts"] });
@@ -172,28 +169,36 @@ export function SwipePostCard({ post, currentUserEmail, comments = [], isMobile 
 
       {/* Reactions */}
       <div className="flex flex-wrap gap-2 mb-4">
-        {REACTIONS.map(({ key, label, emoji }) => {
-          const count = reactions[key] || 0;
-          const isActive = userReactions.has(key);
-          return (
-            <button
-              key={key}
-              onClick={() => handleReaction(key)}
-              disabled={!user || isReacting}
-              className={`px-3 py-2 border-[3px] border-foreground font-semibold text-sm shadow-brutal hover:shadow-brutal-hover hover:translate-x-[2px] hover:translate-y-[2px] transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
-                isActive 
-                  ? isDark 
-                    ? "bg-[#a78bfa] text-white hover:bg-[#8b5cf6]" 
-                    : "bg-[#f97316] text-white hover:bg-[#ea580c]"
-                  : "bg-background hover:bg-secondary"
-              }`}
-            >
-              <span className="mr-1">{emoji}</span>
-              <span className="hidden sm:inline">{label}</span>
-              {count > 0 && <span className="ml-1">· {count}</span>}
-            </button>
-          );
-        })}
+        <button
+          onClick={() => handleReaction('like')}
+          disabled={!user || isReacting}
+          className={`px-3 py-2 border-[3px] border-foreground font-semibold text-sm shadow-brutal hover:shadow-brutal-hover hover:translate-x-[2px] hover:translate-y-[2px] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 ${
+            userReaction === 'like'
+              ? isDark 
+                ? "bg-[#a78bfa] text-white hover:bg-[#8b5cf6]" 
+                : "bg-[#f97316] text-white hover:bg-[#ea580c]"
+              : "bg-background hover:bg-secondary"
+          }`}
+        >
+          <ThumbsUp className="w-4 h-4" />
+          <span>Like</span>
+          {reactions.like > 0 && <span>· {reactions.like}</span>}
+        </button>
+        <button
+          onClick={() => handleReaction('dislike')}
+          disabled={!user || isReacting}
+          className={`px-3 py-2 border-[3px] border-foreground font-semibold text-sm shadow-brutal hover:shadow-brutal-hover hover:translate-x-[2px] hover:translate-y-[2px] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 ${
+            userReaction === 'dislike'
+              ? isDark 
+                ? "bg-[#a78bfa] text-white hover:bg-[#8b5cf6]" 
+                : "bg-[#f97316] text-white hover:bg-[#ea580c]"
+              : "bg-background hover:bg-secondary"
+          }`}
+        >
+          <ThumbsDown className="w-4 h-4" />
+          <span>Dislike</span>
+          {reactions.dislike > 0 && <span>· {reactions.dislike}</span>}
+        </button>
       </div>
 
       {/* Comments */}
