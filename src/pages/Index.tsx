@@ -6,6 +6,13 @@ import { Card } from "@/components/ui/card";
 import { Link } from "react-router-dom";
 import { ArrowRight, Heart, Users, Archive, MessageSquare } from "lucide-react";
 import { useTheme } from "next-themes";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
+import {
+  ChartConfig,
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from "@/components/ui/chart";
 
 const TypingText = ({ text, speed = 100, onComplete, showPreExplosion }: { text: string; speed?: number; onComplete?: () => void; showPreExplosion?: boolean }) => {
   const { theme } = useTheme();
@@ -249,6 +256,31 @@ const Explosion = ({ show, text, onComplete }: { show: boolean; text?: string; o
   );
 };
 
+const chartData = [
+  { 
+    category: "Feel lonely/isolated", 
+    percentage: 40,
+    description: "Self-reported negative impact in survey synthesis"
+  },
+  { 
+    category: "Social media fatigue", 
+    percentage: 32,
+    description: "Burnout/stress from social media use"
+  },
+  { 
+    category: "Feel inadequate", 
+    percentage: 40,
+    description: "Negative social comparison response"
+  },
+];
+
+const chartConfig = {
+  percentage: {
+    label: "Percentage",
+    color: "hsl(var(--background))",
+  },
+} satisfies ChartConfig;
+
 const Index = () => {
   const [showExplosion, setShowExplosion] = useState(false);
   const [showNewText, setShowNewText] = useState(false);
@@ -325,9 +357,61 @@ const Index = () => {
             <h2 className="text-3xl md:text-4xl font-bold mb-6 text-background">
               Why?
             </h2>
-            <p className="text-lg md:text-xl text-background leading-relaxed">
+            <p className="text-lg md:text-xl text-background leading-relaxed mb-8">
               Because perfection is boring, and vulnerability is brave. We're building a space where failures aren't hidden—they're shared, celebrated, and learned from. No more pretending to have it all figured out.
             </p>
+            
+            {/* Chart */}
+            <div className="mt-8 max-w-2xl">
+              <ChartContainer config={chartConfig} className="h-[250px] w-full">
+                <BarChart
+                  data={chartData}
+                  margin={{
+                    left: 12,
+                    right: 12,
+                    top: 12,
+                    bottom: 60,
+                  }}
+                >
+                  <CartesianGrid vertical={false} stroke="rgba(255, 255, 255, 0.2)" />
+                  <XAxis
+                    dataKey="category"
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={8}
+                    tick={{ fill: "white", fontSize: 11 }}
+                    angle={-45}
+                    textAnchor="end"
+                    height={100}
+                    interval={0}
+                  />
+                  <YAxis
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={8}
+                    tick={{ fill: "white", fontSize: 12 }}
+                    domain={[0, 50]}
+                    label={{ value: "%", position: "insideLeft", fill: "white", style: { textAnchor: "middle" } }}
+                    width={40}
+                  />
+                  <ChartTooltip
+                    cursor={false}
+                    content={<ChartTooltipContent 
+                      indicator="dot"
+                      formatter={(value, name, props) => [
+                        `${value}%`,
+                        props.payload.description
+                      ]}
+                    />}
+                  />
+                  <Bar
+                    dataKey="percentage"
+                    fill="var(--color-percentage)"
+                    radius={[4, 4, 0, 0]}
+                  />
+                </BarChart>
+              </ChartContainer>
+            </div>
           </div>
         </div>
       </section>
