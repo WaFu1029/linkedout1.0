@@ -27,12 +27,12 @@ export function Navbar() {
             <Link to="/wall" className="font-semibold hover:text-primary transition-colors">
               The Wall
             </Link>
-            <ThemeToggle />
             {user ? (
               <>
                 <Link to="/profile" className="font-semibold hover:text-primary transition-colors">
                   Profile
                 </Link>
+                <ThemeToggle />
                 <Button variant="outline" size="sm" onClick={async () => {
                   await signOut();
                   navigate("/");
@@ -42,6 +42,7 @@ export function Navbar() {
               </>
             ) : (
               <>
+                <ThemeToggle />
                 <Button variant="outline" size="sm" onClick={() => navigate("/auth")}>
                   Sign In
                 </Button>
@@ -78,9 +79,6 @@ export function Navbar() {
             >
               The Wall
             </Link>
-            <div className="pt-2">
-              <ThemeToggle />
-            </div>
             {user ? (
               <>
                 <Link
@@ -90,20 +88,24 @@ export function Navbar() {
                 >
                   Profile
                 </Link>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={async () => { 
-                    await signOut(); 
-                    setIsOpen(false);
-                    navigate("/");
-                  }}
-                >
-                  Sign Out
-                </Button>
+                <div className="flex items-center gap-2 pt-2">
+                  <ThemeToggle />
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={async () => { 
+                      await signOut(); 
+                      setIsOpen(false);
+                      navigate("/");
+                    }}
+                  >
+                    Sign Out
+                  </Button>
+                </div>
               </>
             ) : (
               <div className="flex gap-2 pt-2">
+                <ThemeToggle />
                 <Button variant="outline" size="sm" onClick={() => { navigate("/auth"); setIsOpen(false); }}>
                   Sign In
                 </Button>
