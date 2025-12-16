@@ -45,10 +45,8 @@ const Index = () => {
             <div className="inline-block bg-foreground text-background px-4 py-2 mb-6 border-[3px] border-foreground font-mono text-sm">
               <TypingText text="THE ANTI-LINKEDIN" speed={80} />
             </div>
-            <h1 className="text-5xl md:text-7xl font-bold mb-6 leading-tight animate-fade-in-up animation-delay-100">
-              Share your <span className="text-primary">failures</span>.
-              <br />
-              Find your <span className="text-primary">people</span>.
+            <h1 className="text-5xl md:text-7xl font-bold mb-6 leading-tight">
+              <TypingText text="I am excited to announce..." speed={80} />
             </h1>
             <p className="text-xl md:text-2xl text-muted-foreground mb-10 max-w-2xl mx-auto animate-fade-in-up animation-delay-200">
               A social platform where vulnerability is celebrated, rejections are shared, and nobody's pretending to have it all figured out.
