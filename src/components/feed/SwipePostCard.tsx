@@ -42,12 +42,32 @@ export function SwipePostCard({ post, currentUserEmail, comments = [], isMobile 
   const [showComments, setShowComments] = useState(false);
   const [newComment, setNewComment] = useState("");
   const [isReacting, setIsReacting] = useState(false);
+  const [userReactions, setUserReactions] = useState<Set<string>>(new Set());
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
   const reactions = post.reactions || {};
   const postComments = comments.filter((c) => c.id === post.id);
   const firstName = post.author?.split(" ")[0] || post.author;
+
+  // Fetch user's reactions for this post
+  useEffect(() => {
+    const fetchUserReactions = async () => {
+      if (!user || !post.id) return;
+      
+      const { data } = await supabase
+        .from("reactions")
+        .select("reaction_type")
+        .eq("post_id", post.id)
+        .eq("user_id", user.id);
+
+      if (data) {
+        setUserReactions(new Set(data.map((r) => r.reaction_type)));
+      }
+    };
+
+    fetchUserReactions();
+  }, [user, post.id]);
 
   const handleReaction = async (reactionKey: keyof Reaction) => {
     if (!user || !post.id || isReacting) return;
@@ -85,6 +105,15 @@ export function SwipePostCard({ post, currentUserEmail, comments = [], isMobile 
 
         if (error) throw error;
       }
+
+      // Update local state immediately for visual feedback
+      const newUserReactions = new Set(userReactions);
+      if (existingReaction) {
+        newUserReactions.delete(reactionKey);
+      } else {
+        newUserReactions.add(reactionKey);
+      }
+      setUserReactions(newUserReactions);
 
       // Invalidate queries to refresh reactions
       queryClient.invalidateQueries({ queryKey: ["posts"] });
@@ -142,12 +171,17 @@ export function SwipePostCard({ post, currentUserEmail, comments = [], isMobile 
       <div className="flex flex-wrap gap-2 mb-4">
         {REACTIONS.map(({ key, label, emoji }) => {
           const count = reactions[key] || 0;
+          const isActive = userReactions.has(key);
           return (
             <button
               key={key}
               onClick={() => handleReaction(key)}
               disabled={!user || isReacting}
-              className="px-3 py-2 border-[3px] border-foreground font-semibold text-sm shadow-brutal hover:shadow-brutal-hover hover:translate-x-[2px] hover:translate-y-[2px] transition-all bg-background hover:bg-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+              className={`px-3 py-2 border-[3px] border-foreground font-semibold text-sm shadow-brutal hover:shadow-brutal-hover hover:translate-x-[2px] hover:translate-y-[2px] transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                isActive 
+                  ? "bg-[#f97316] text-white hover:bg-[#ea580c]" 
+                  : "bg-background hover:bg-secondary"
+              }`}
             >
               <span className="mr-1">{emoji}</span>
               <span className="hidden sm:inline">{label}</span>

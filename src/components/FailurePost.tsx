@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface FailurePostProps {
   id: string;
@@ -43,8 +43,28 @@ export function FailurePost({
   size = "sm",
 }: FailurePostProps) {
   const [isReacting, setIsReacting] = useState(false);
+  const [userReactions, setUserReactions] = useState<Set<string>>(new Set());
   const queryClient = useQueryClient();
   const { user } = useAuth();
+
+  // Fetch user's reactions for this post
+  useEffect(() => {
+    const fetchUserReactions = async () => {
+      if (!user || !id) return;
+      
+      const { data } = await supabase
+        .from("reactions")
+        .select("reaction_type")
+        .eq("post_id", id)
+        .eq("user_id", user.id);
+
+      if (data) {
+        setUserReactions(new Set(data.map((r) => r.reaction_type)));
+      }
+    };
+
+    fetchUserReactions();
+  }, [user, id]);
 
   const handleReaction = async (reactionType: "same" | "itsOk" | "youreDoingGreat" | "youGotThis") => {
     if (!user || !id || isReacting) return;
@@ -82,6 +102,15 @@ export function FailurePost({
 
         if (error) throw error;
       }
+
+      // Update local state immediately for visual feedback
+      const newUserReactions = new Set(userReactions);
+      if (existingReaction) {
+        newUserReactions.delete(reactionType);
+      } else {
+        newUserReactions.add(reactionType);
+      }
+      setUserReactions(newUserReactions);
 
       // Invalidate queries to refresh reactions
       queryClient.invalidateQueries({ queryKey: ["posts"] });
@@ -125,6 +154,7 @@ export function FailurePost({
           size="reaction"
           onClick={() => handleReaction("same")}
           disabled={!user || isReacting}
+          className={userReactions.has("same") ? "bg-[#f97316] text-white hover:bg-[#ea580c]" : ""}
         >
           Same · {reactions.same}
         </Button>
@@ -133,6 +163,7 @@ export function FailurePost({
           size="reaction"
           onClick={() => handleReaction("itsOk")}
           disabled={!user || isReacting}
+          className={userReactions.has("itsOk") ? "bg-[#f97316] text-white hover:bg-[#ea580c]" : ""}
         >
           It's ok · {reactions.itsOk}
         </Button>
@@ -141,6 +172,7 @@ export function FailurePost({
           size="reaction"
           onClick={() => handleReaction("youreDoingGreat")}
           disabled={!user || isReacting}
+          className={userReactions.has("youreDoingGreat") ? "bg-[#f97316] text-white hover:bg-[#ea580c]" : ""}
         >
           You're doing great! · {reactions.youreDoingGreat}
         </Button>
@@ -149,6 +181,7 @@ export function FailurePost({
           size="reaction"
           onClick={() => handleReaction("youGotThis")}
           disabled={!user || isReacting}
+          className={userReactions.has("youGotThis") ? "bg-[#f97316] text-white hover:bg-[#ea580c]" : ""}
         >
           You got this! · {reactions.youGotThis}
         </Button>
