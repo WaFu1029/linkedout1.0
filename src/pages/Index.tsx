@@ -376,34 +376,6 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Reactions Section */}
-      <section className="py-16 md:py-24">
-        <div className="container mx-auto px-4">
-          <div className="max-w-3xl mx-auto text-center">
-            <h2 className="text-3xl md:text-4xl font-bold mb-8">
-              React with <span className="text-primary">empathy</span>
-            </h2>
-            <p className="text-lg text-muted-foreground mb-10">
-              No likes. No claps. Just four ways to say "I see you":
-            </p>
-            <div className="flex flex-wrap justify-center gap-4">
-              <Button variant="reaction" size="lg" className="text-base">
-                Same 🙃
-              </Button>
-              <Button variant="reaction" size="lg" className="text-base">
-                It's ok 💛
-              </Button>
-              <Button variant="reaction" size="lg" className="text-base">
-                You're doing great! ✨
-              </Button>
-              <Button variant="reaction" size="lg" className="text-base">
-                You got this! 💪
-              </Button>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* CTA Section */}
       <section className="py-16 md:py-24 bg-primary">
         <div className="container mx-auto px-4">
