@@ -182,6 +182,7 @@ const Profile = () => {
         timestamp: formatDistanceToNow(new Date(post.created_at), { addSuffix: true }),
         reactions: reactionsByPost[post.id] || { like: 0, dislike: 0 },
         comments: commentsByPost[post.id] || [],
+        author_id: post.author_id,
       }));
     },
     enabled: !!profileId && !!profile,
@@ -398,7 +399,17 @@ const Profile = () => {
   };
 
   const handleFollow = async () => {
-    if (!user || !profileId || isOwnProfile || isFollowingLoading) return;
+    if (!user) {
+      toast.error("Create an account to interact with other users", {
+        action: {
+          label: "Sign Up",
+          onClick: () => navigate("/auth?mode=signup"),
+        },
+      });
+      return;
+    }
+    
+    if (!profileId || isOwnProfile || isFollowingLoading) return;
 
     setIsFollowingLoading(true);
     try {
@@ -563,12 +574,12 @@ const Profile = () => {
                         </Button>
                       )}
                     </>
-                  ) : user && (
+                  ) : (
                     <Button
                       onClick={handleFollow}
                       disabled={isFollowingLoading}
                       variant={isFollowing ? "outline" : "default"}
-                      className="border-[3px] border-foreground"
+                      className={`border-[3px] border-foreground ${!user ? "opacity-50 cursor-not-allowed" : ""}`}
                     >
                       {isFollowingLoading ? (
                         <Loader2 className="w-4 h-4 animate-spin mr-1" />
@@ -761,6 +772,7 @@ const Profile = () => {
                       reactions={post.reactions}
                       comments={post.comments}
                       size="md"
+                      author_id={post.author_id}
                     />
                   ))}
                 </div>

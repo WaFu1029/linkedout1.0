@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Quote, ArrowRight, Heart, UserPlus, UserMinus, Loader2 } from "lucide-react";
@@ -30,6 +30,7 @@ interface ProfileSidebarProps {
 
 export function ProfileSidebar({ profile, post }: ProfileSidebarProps) {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [isFollowing, setIsFollowing] = useState(false);
   const [isFollowingLoading, setIsFollowingLoading] = useState(false);
   const [isCheckingFollow, setIsCheckingFollow] = useState(true);
@@ -70,7 +71,17 @@ export function ProfileSidebar({ profile, post }: ProfileSidebarProps) {
   }, [profileId, user, isOwnProfile]);
 
   const handleFollow = async () => {
-    if (!user || !profileId || isOwnProfile || isFollowingLoading) return;
+    if (!user) {
+      toast.error("Create an account to interact with other users", {
+        action: {
+          label: "Sign Up",
+          onClick: () => navigate("/auth?mode=signup"),
+        },
+      });
+      return;
+    }
+    
+    if (!profileId || isOwnProfile || isFollowingLoading) return;
 
     setIsFollowingLoading(true);
     try {
@@ -148,12 +159,12 @@ export function ProfileSidebar({ profile, post }: ProfileSidebarProps) {
       {/* Follow Button and View Full Profile Link */}
       {post.author_email && (
         <div className="mt-auto space-y-2">
-          {user && !isOwnProfile && profileId && (
+          {!isOwnProfile && profileId && (
             <Button
               onClick={handleFollow}
               disabled={isFollowingLoading || isCheckingFollow}
               variant={isFollowing ? "outline" : "default"}
-              className="w-full border-[3px] border-foreground shadow-brutal"
+              className={`w-full border-[3px] border-foreground shadow-brutal ${!user ? "opacity-50 cursor-not-allowed" : ""}`}
             >
               {isFollowingLoading ? (
                 <>

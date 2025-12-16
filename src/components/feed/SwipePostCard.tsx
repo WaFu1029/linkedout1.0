@@ -2,11 +2,23 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { MessageCircle, ChevronDown, ChevronUp, ThumbsUp, ThumbsDown } from "lucide-react";
+import { MessageCircle, ChevronDown, ChevronUp, ThumbsUp, ThumbsDown, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "next-themes";
+import { toast } from "sonner";
+import { useNavigate } from "react-router-dom";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Reaction {
   like?: number;
@@ -22,6 +34,7 @@ interface Post {
   tags?: string[];
   timestamp: string;
   reactions?: Reaction;
+  author_id?: string;
 }
 
 interface SwipePostCardProps {
@@ -36,10 +49,15 @@ export function SwipePostCard({ post, currentUserEmail, comments = [], isMobile 
   const [newComment, setNewComment] = useState("");
   const [isReacting, setIsReacting] = useState(false);
   const [userReaction, setUserReaction] = useState<string | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
+  const navigate = useNavigate();
+
+  const isOwnPost = user?.id === post.author_id;
 
   const reactions = post.reactions || { like: 0, dislike: 0 };
   const postComments = comments.filter((c) => c.id === post.id);
@@ -127,6 +145,16 @@ export function SwipePostCard({ post, currentUserEmail, comments = [], isMobile 
   };
 
   const handleComment = () => {
+    if (!user) {
+      toast.error("Create an account to interact with other users", {
+        action: {
+          label: "Sign Up",
+          onClick: () => navigate("/auth?mode=signup"),
+        },
+      });
+      return;
+    }
+    
     if (newComment.trim() && newComment.split(/\s+/).length <= 3) {
       // TODO: Implement comment logic with Supabase
       console.log("Comment:", newComment);
@@ -136,13 +164,63 @@ export function SwipePostCard({ post, currentUserEmail, comments = [], isMobile 
 
   const wordCount = newComment.trim().split(/\s+/).filter(Boolean).length;
 
+  const handleDelete = async () => {
+    if (!user || !post.id || !isOwnPost) return;
+
+    setIsDeleting(true);
+    try {
+      const { error } = await supabase
+        .from("posts")
+        .delete()
+        .eq("id", post.id)
+        .eq("author_id", user.id);
+
+      if (error) throw error;
+
+      toast.success("Post deleted");
+      queryClient.invalidateQueries({ queryKey: ["posts"] });
+      queryClient.invalidateQueries({ queryKey: ["profile-posts"] });
+      queryClient.invalidateQueries({ queryKey: ["wall-posts"] });
+      setShowDeleteDialog(false);
+    } catch (error) {
+      console.error("Error deleting post:", error);
+      toast.error("Failed to delete post");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
-    <Card className={`p-6 flex flex-col ${isMobile ? "h-full overflow-y-auto" : "h-full"}`}>
+    <Card className={`p-6 flex flex-col ${isMobile ? "h-full overflow-y-auto" : "h-full"} relative`}>
       {/* Author - only on mobile since desktop has sidebar */}
       {isMobile && (
-        <div className="mb-4">
-          <p className="font-bold text-xl">{firstName}</p>
-          <p className="text-sm font-semibold text-primary font-mono">{post.industry}</p>
+        <div className="mb-4 flex items-start justify-between">
+          <div>
+            <p className="font-bold text-xl">{firstName}</p>
+            <p className="text-sm font-semibold text-primary font-mono">{post.industry}</p>
+          </div>
+          {isOwnPost && (
+            <button
+              onClick={() => setShowDeleteDialog(true)}
+              className="p-2 hover:bg-secondary border-[3px] border-foreground transition-colors"
+              aria-label="Delete post"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Delete button for desktop */}
+      {!isMobile && isOwnPost && (
+        <div className="absolute top-4 right-4">
+          <button
+            onClick={() => setShowDeleteDialog(true)}
+            className="p-2 hover:bg-secondary border-[3px] border-foreground transition-colors"
+            aria-label="Delete post"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
         </div>
       )}
 
@@ -177,8 +255,12 @@ export function SwipePostCard({ post, currentUserEmail, comments = [], isMobile 
       <div className="flex flex-wrap gap-2 mb-4">
         <button
           onClick={() => handleReaction('like')}
-          disabled={!user || isReacting}
-          className={`px-3 py-2 border-[3px] border-foreground font-semibold text-sm shadow-brutal hover:shadow-brutal-hover hover:translate-x-[2px] hover:translate-y-[2px] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 ${
+          disabled={isReacting}
+          className={`px-3 py-2 border-[3px] border-foreground font-semibold text-sm shadow-brutal transition-all flex items-center gap-2 ${
+            !user 
+              ? "opacity-50 cursor-not-allowed" 
+              : "hover:shadow-brutal-hover hover:translate-x-[2px] hover:translate-y-[2px]"
+          } ${
             userReaction === 'like'
               ? isDark 
                 ? "bg-[#a78bfa] text-white hover:bg-[#8b5cf6]" 
@@ -192,8 +274,12 @@ export function SwipePostCard({ post, currentUserEmail, comments = [], isMobile 
         </button>
         <button
           onClick={() => handleReaction('dislike')}
-          disabled={!user || isReacting}
-          className={`px-3 py-2 border-[3px] border-foreground font-semibold text-sm shadow-brutal hover:shadow-brutal-hover hover:translate-x-[2px] hover:translate-y-[2px] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 ${
+          disabled={isReacting}
+          className={`px-3 py-2 border-[3px] border-foreground font-semibold text-sm shadow-brutal transition-all flex items-center gap-2 ${
+            !user 
+              ? "opacity-50 cursor-not-allowed" 
+              : "hover:shadow-brutal-hover hover:translate-x-[2px] hover:translate-y-[2px]"
+          } ${
             userReaction === 'dislike'
               ? isDark 
                 ? "bg-[#a78bfa] text-white hover:bg-[#8b5cf6]" 
@@ -232,7 +318,7 @@ export function SwipePostCard({ post, currentUserEmail, comments = [], isMobile 
             <p className="text-sm text-muted-foreground italic">No comments yet</p>
           )}
 
-          {currentUserEmail && (
+          {user ? (
             <div className="flex gap-2 mt-3">
               <Input
                 value={newComment}
@@ -249,12 +335,65 @@ export function SwipePostCard({ post, currentUserEmail, comments = [], isMobile 
                 Post
               </Button>
             </div>
+          ) : (
+            <div className="flex gap-2 mt-3">
+              <Input
+                value=""
+                placeholder="3 words max..."
+                disabled
+                className="border-[3px] border-foreground opacity-50 cursor-not-allowed"
+                onClick={() => {
+                  toast.error("Create an account to interact with other users", {
+                    action: {
+                      label: "Sign Up",
+                      onClick: () => navigate("/auth?mode=signup"),
+                    },
+                  });
+                }}
+              />
+              <Button
+                onClick={() => {
+                  toast.error("Create an account to interact with other users", {
+                    action: {
+                      label: "Sign Up",
+                      onClick: () => navigate("/auth?mode=signup"),
+                    },
+                  });
+                }}
+                disabled
+                className="border-[3px] border-foreground shadow-brutal opacity-50 cursor-not-allowed"
+              >
+                Post
+              </Button>
+            </div>
           )}
           {wordCount > 3 && (
             <p className="text-destructive text-xs font-bold mt-2">Max 3 words!</p>
           )}
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent className="border-[3px] border-foreground shadow-brutal bg-background">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-xl font-bold">Delete Post?</AlertDialogTitle>
+            <AlertDialogDescription className="text-base">
+              Are you sure you want to delete this post? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2">
+            <AlertDialogCancel className="border-[3px] border-foreground shadow-brutal">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground border-[3px] border-foreground shadow-brutal"
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }
