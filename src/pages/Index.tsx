@@ -39,7 +39,7 @@ const Index = () => {
       <Navbar />
 
       {/* Hero Section */}
-      <section className="min-h-[calc(100vh-64px)] flex items-center justify-center pt-24 pb-48 md:pt-32 md:pb-64">
+      <section className="min-h-[calc(100vh-64px)] flex items-center justify-center pt-32 pb-48 md:pt-40 md:pb-64">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto text-center">
             <div className="inline-block bg-foreground text-background px-4 py-2 mb-6 border-[3px] border-foreground font-mono text-sm">
