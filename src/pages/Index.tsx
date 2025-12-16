@@ -1,12 +1,15 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Link } from "react-router-dom";
 import { ArrowRight, Heart, Users, Archive, MessageSquare } from "lucide-react";
+import { useTheme } from "next-themes";
 
 const TypingText = ({ text, speed = 100, onComplete, showPreExplosion }: { text: string; speed?: number; onComplete?: () => void; showPreExplosion?: boolean }) => {
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   const [displayedText, setDisplayedText] = useState("");
   const [isTyping, setIsTyping] = useState(true);
   const [isPreExploding, setIsPreExploding] = useState(false);
@@ -60,7 +63,7 @@ const TypingText = ({ text, speed = 100, onComplete, showPreExplosion }: { text:
       isCancelled = true;
       clearInterval(typingInterval);
     };
-  }, [text, speed, onComplete, showPreExplosion]);
+  }, [text, speed, onComplete, showPreExplosion, isDark]);
 
   // Split by newlines and handle each line separately
   const lines = displayedText.split('\n');
@@ -83,8 +86,9 @@ const TypingText = ({ text, speed = 100, onComplete, showPreExplosion }: { text:
               return (
                 <span
                   key={`${lineIndex}-${charIndex}`}
-                  className={isPreExploding ? "inline-block" : "inline"}                  style={isPreExploding ? {
-                    animation: `pre-explode-char 0.75s ease-out forwards`,
+                  className={isPreExploding ? "inline-block" : "inline"}
+                  style={isPreExploding ? {
+                    animation: isDark ? `pre-explode-char-dark 0.75s ease-out forwards` : `pre-explode-char 0.75s ease-out forwards`,
                     animationDelay: `${(distanceFromCenter / allChars.length) * 0.2}s`,
                     transformOrigin: 'center',
                     '--offset': `${offset}px`,
@@ -105,7 +109,10 @@ const TypingText = ({ text, speed = 100, onComplete, showPreExplosion }: { text:
 };
 
 const Explosion = ({ show, text, onComplete }: { show: boolean; text?: string; onComplete?: () => void }) => {
-  const [particles] = useState(() => {
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
+  
+  const particles = useMemo(() => {
     return Array.from({ length: 60 }, (_, i) => {  // More particles
       const angle = (360 / 60) * i;
       const angleRad = (angle * Math.PI) / 180;
@@ -116,6 +123,10 @@ const Explosion = ({ show, text, onComplete }: { show: boolean; text?: string; o
       const x = Math.cos(angleRad) * distance;
       const y = Math.sin(angleRad) * distance;
       
+      // Use lilac colors in dark mode, orange in light mode
+      const color1 = isDark ? '#a78bfa' : '#ef4444'; // Light lilac or red
+      const color2 = isDark ? '#c084fc' : '#f97316'; // Medium lilac or orange
+      
       return {
         id: i,
         angle,
@@ -123,10 +134,10 @@ const Explosion = ({ show, text, onComplete }: { show: boolean; text?: string; o
         y,
         delay,
         size,
-        color: isRed ? '#ef4444' : '#f97316',
+        color: isRed ? color1 : color2,
       };
     });
-  });
+  }, [isDark]);
 
   const [textFragments] = useState(() => {
     if (!text) return [];
@@ -193,7 +204,7 @@ const Explosion = ({ show, text, onComplete }: { show: boolean; text?: string; o
       document.head.removeChild(styleSheet);
       clearTimeout(timeout);
     };
-  }, [show, particles, textFragments, onComplete]);
+  }, [show, particles, textFragments, onComplete, isDark]);
 
   if (!show) return null;
 

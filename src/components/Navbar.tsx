@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Menu, X } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
@@ -26,6 +27,7 @@ export function Navbar() {
             <Link to="/wall" className="font-semibold hover:text-primary transition-colors">
               The Wall
             </Link>
+            <ThemeToggle />
             {user ? (
               <>
                 <Link to="/profile" className="font-semibold hover:text-primary transition-colors">
@@ -76,6 +78,9 @@ export function Navbar() {
             >
               The Wall
             </Link>
+            <div className="pt-2">
+              <ThemeToggle />
+            </div>
             {user ? (
               <>
                 <Link

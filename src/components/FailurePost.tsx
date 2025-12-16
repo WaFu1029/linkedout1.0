@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTheme } from "next-themes";
 import { useState, useEffect } from "react";
 
 interface FailurePostProps {
@@ -46,6 +47,8 @@ export function FailurePost({
   const [userReactions, setUserReactions] = useState<Set<string>>(new Set());
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
 
   // Fetch user's reactions for this post
   useEffect(() => {
@@ -154,7 +157,7 @@ export function FailurePost({
           size="reaction"
           onClick={() => handleReaction("same")}
           disabled={!user || isReacting}
-          className={userReactions.has("same") ? "bg-[#f97316] text-white hover:bg-[#ea580c]" : ""}
+          className={userReactions.has("same") ? isDark ? "bg-[#a78bfa] text-white hover:bg-[#8b5cf6]" : "bg-[#f97316] text-white hover:bg-[#ea580c]" : ""}
         >
           Same · {reactions.same}
         </Button>
@@ -163,7 +166,7 @@ export function FailurePost({
           size="reaction"
           onClick={() => handleReaction("itsOk")}
           disabled={!user || isReacting}
-          className={userReactions.has("itsOk") ? "bg-[#f97316] text-white hover:bg-[#ea580c]" : ""}
+          className={userReactions.has("itsOk") ? isDark ? "bg-[#a78bfa] text-white hover:bg-[#8b5cf6]" : "bg-[#f97316] text-white hover:bg-[#ea580c]" : ""}
         >
           It's ok · {reactions.itsOk}
         </Button>
@@ -172,7 +175,7 @@ export function FailurePost({
           size="reaction"
           onClick={() => handleReaction("youreDoingGreat")}
           disabled={!user || isReacting}
-          className={userReactions.has("youreDoingGreat") ? "bg-[#f97316] text-white hover:bg-[#ea580c]" : ""}
+          className={userReactions.has("youreDoingGreat") ? isDark ? "bg-[#a78bfa] text-white hover:bg-[#8b5cf6]" : "bg-[#f97316] text-white hover:bg-[#ea580c]" : ""}
         >
           You're doing great! · {reactions.youreDoingGreat}
         </Button>
@@ -181,7 +184,7 @@ export function FailurePost({
           size="reaction"
           onClick={() => handleReaction("youGotThis")}
           disabled={!user || isReacting}
-          className={userReactions.has("youGotThis") ? "bg-[#f97316] text-white hover:bg-[#ea580c]" : ""}
+          className={userReactions.has("youGotThis") ? isDark ? "bg-[#a78bfa] text-white hover:bg-[#8b5cf6]" : "bg-[#f97316] text-white hover:bg-[#ea580c]" : ""}
         >
           You got this! · {reactions.youGotThis}
         </Button>

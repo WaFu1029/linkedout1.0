@@ -6,6 +6,7 @@ import { MessageCircle, ChevronDown, ChevronUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTheme } from "next-themes";
 
 interface Reaction {
   same?: number;
@@ -45,6 +46,8 @@ export function SwipePostCard({ post, currentUserEmail, comments = [], isMobile 
   const [userReactions, setUserReactions] = useState<Set<string>>(new Set());
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
 
   const reactions = post.reactions || {};
   const postComments = comments.filter((c) => c.id === post.id);
@@ -179,7 +182,9 @@ export function SwipePostCard({ post, currentUserEmail, comments = [], isMobile 
               disabled={!user || isReacting}
               className={`px-3 py-2 border-[3px] border-foreground font-semibold text-sm shadow-brutal hover:shadow-brutal-hover hover:translate-x-[2px] hover:translate-y-[2px] transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                 isActive 
-                  ? "bg-[#f97316] text-white hover:bg-[#ea580c]" 
+                  ? isDark 
+                    ? "bg-[#a78bfa] text-white hover:bg-[#8b5cf6]" 
+                    : "bg-[#f97316] text-white hover:bg-[#ea580c]"
                   : "bg-background hover:bg-secondary"
               }`}
             >
