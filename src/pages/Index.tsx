@@ -300,7 +300,7 @@ const Index = () => {
               )}
             </h1>
             <p className="text-xl md:text-2xl text-muted-foreground mb-10 max-w-2xl mx-auto animate-fade-in-up animation-delay-200">
-              A social platform we celebrate vulnerability, relate to rejection, and don't pretend to have it all figured out.
+              A social where we celebrate vulnerability, relate to rejection, and don't pretend to have it all figured out.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in-up animation-delay-300">
               <Button size="xl" asChild>
