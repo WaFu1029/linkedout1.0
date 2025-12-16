@@ -360,35 +360,36 @@ const Index = () => {
             
             {/* Chart */}
             <div className="max-w-2xl">
-              <ChartContainer config={chartConfig} className="h-[250px] w-full">
+              <h3 className="text-xl md:text-2xl font-bold mb-4 text-background">
+                The Effects of Social Media on Mental Health
+              </h3>
+              <ChartContainer config={chartConfig} className="h-[400px] w-full">
                 <BarChart
                   data={chartData}
                   margin={{
                     left: 12,
                     right: 12,
                     top: 12,
-                    bottom: 60,
+                    bottom: 40,
                   }}
                 >
-                  <CartesianGrid vertical={false} stroke="rgba(255, 255, 255, 0.2)" />
+                  <CartesianGrid vertical={false} stroke="rgba(255, 255, 255, 0.3)" />
                   <XAxis
                     dataKey="category"
                     tickLine={false}
                     axisLine={false}
                     tickMargin={8}
-                    tick={{ fill: "white", fontSize: 11 }}
-                    angle={-45}
-                    textAnchor="end"
-                    height={100}
+                    tick={{ fill: "#ffffff", fontSize: 12 }}
+                    height={60}
                     interval={0}
                   />
                   <YAxis
                     tickLine={false}
                     axisLine={false}
                     tickMargin={8}
-                    tick={{ fill: "white", fontSize: 12 }}
+                    tick={{ fill: "#ffffff", fontSize: 12 }}
                     domain={[0, 50]}
-                    label={{ value: "%", position: "insideLeft", fill: "white", style: { textAnchor: "middle" } }}
+                    label={{ value: "%", position: "insideLeft", fill: "#ffffff", style: { textAnchor: "middle" } }}
                     width={40}
                   />
                   <ChartTooltip
