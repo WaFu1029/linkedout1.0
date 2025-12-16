@@ -172,7 +172,7 @@ const Index = () => {
               asChild
             >
               <Link to="/auth?mode=signup">
-                Join LinkedOut <ArrowRight className="ml-2" />
+                Let's Link Out <ArrowRight className="ml-2" />
               </Link>
             </Button>
           </div>
