@@ -1,87 +1,57 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { WallPost } from "@/components/WallPost";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
-
-// Mock data for The Wall - anonymous failures
-const mockWallPosts = [
-  {
-    id: "w1",
-    content: "Spent 6 months learning to code. Built my first app. It crashed on demo day in front of 50 investors. Twice.",
-    tags: ["coding", "startup failure", "public speaking"],
-  },
-  {
-    id: "w2",
-    content: "Applied to 347 jobs over 8 months. Got 12 interviews. 0 offers. Then I got one. Persistence is weird.",
-    tags: ["job search", "rejection", "persistence"],
-  },
-  {
-    id: "w3",
-    content: "Told my manager I deserved a promotion. They agreed. Then they laid me off the next month. Budget cuts.",
-    tags: ["career", "layoffs", "irony"],
-  },
-  {
-    id: "w4",
-    content: "Wrote a book. Took 4 years. 23 publishers rejected it. Self-published. Sold 14 copies. 12 were my mom.",
-    tags: ["creative failure", "rejection", "writing"],
-  },
-  {
-    id: "w5",
-    content: "Started a podcast about productivity. Missed every single publishing deadline I set for myself.",
-    tags: ["irony", "productivity", "creative failure"],
-  },
-  {
-    id: "w6",
-    content: "Got the job. Hated the job. Quit the job. Now I'm back at square one but at least I know what I don't want.",
-    tags: ["career", "self-discovery", "job search"],
-  },
-  {
-    id: "w7",
-    content: "Pitched my heart out. Client said 'we'll think about it.' That was 2019. Still thinking I guess.",
-    tags: ["client work", "rejection", "freelancing"],
-  },
-  {
-    id: "w8",
-    content: "Learned a new skill every month for a year. Master of none, but at least I know I like learning more than doing.",
-    tags: ["self-discovery", "learning", "imposter syndrome"],
-  },
-  {
-    id: "w9",
-    content: "Sent a strongly worded email to the wrong person. That person was my CEO. We had a 'chat' about communication.",
-    tags: ["embarrassing", "career", "communication"],
-  },
-  {
-    id: "w10",
-    content: "Bootstrapped for 5 years. Finally took VC money. Regretted it in 5 months. Money isn't everything.",
-    tags: ["startup failure", "entrepreneurship", "lessons learned"],
-  },
-];
-
-const allWallTags = [
-  "rejection",
-  "job search",
-  "startup failure",
-  "career",
-  "embarrassing",
-  "creative failure",
-  "imposter syndrome",
-  "lessons learned",
-  "self-discovery",
-  "freelancing",
-];
+import { Search, Loader2 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 const Wall = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
 
-  const filteredPosts = mockWallPosts.filter((post) => {
-    const matchesSearch = post.content.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesTag = selectedTag ? post.tags.includes(selectedTag) : true;
-    return matchesSearch && matchesTag;
+  // Fetch all posts from Supabase
+  const { data: allPosts = [], isLoading } = useQuery({
+    queryKey: ["wall-posts"],
+    queryFn: async () => {
+      // @ts-ignore - posts table types will be available after migration
+      const { data: postsData, error } = await (supabase as any)
+        .from("posts")
+        .select("id, content, tags")
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error("Error fetching wall posts:", error);
+        return [];
+      }
+
+      return postsData || [];
+    },
   });
+
+  // Extract all unique tags from posts
+  const allWallTags = useMemo(() => {
+    const tagSet = new Set<string>();
+    allPosts.forEach((post) => {
+      if (post.tags && Array.isArray(post.tags)) {
+        post.tags.forEach((tag) => tagSet.add(tag));
+      }
+    });
+    return Array.from(tagSet).sort();
+  }, [allPosts]);
+
+  // Filter posts based on search and tag selection
+  const filteredPosts = useMemo(() => {
+    return allPosts.filter((post) => {
+      const matchesSearch = post.content?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false;
+      const matchesTag = selectedTag 
+        ? post.tags?.includes(selectedTag) ?? false
+        : true;
+      return matchesSearch && matchesTag;
+    });
+  }, [allPosts, searchQuery, selectedTag]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -98,8 +68,8 @@ const Wall = () => {
             
             {/* Stats */}
             <div className="inline-block bg-foreground text-background px-6 py-4 border-[3px] border-foreground mb-8">
-              <p className="text-3xl font-bold font-mono">{mockWallPosts.length}</p>
-              <p className="text-sm uppercase tracking-wide">Failures.</p>
+              <p className="text-3xl font-bold font-mono">{isLoading ? "..." : allPosts.length}</p>
+              <p className="text-sm uppercase tracking-wide">Failures archived forever</p>
             </div>
           </div>
 
@@ -139,21 +109,33 @@ const Wall = () => {
             </div>
           </div>
 
-          {/* Wall Posts - Masonry-like grid */}
-          <div className="max-w-4xl mx-auto">
-            <div className="columns-1 md:columns-2 gap-4 space-y-4">
-              {filteredPosts.map((post) => (
-                <div key={post.id} className="break-inside-avoid">
-                  <WallPost content={post.content} tags={post.tags} />
-                </div>
-              ))}
+          {/* Loading State */}
+          {isLoading && (
+            <div className="text-center py-16">
+              <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto mb-4" />
+              <p className="text-muted-foreground font-semibold">Loading failures...</p>
             </div>
-          </div>
+          )}
 
-          {filteredPosts.length === 0 && (
+          {/* Wall Posts - Masonry-like grid */}
+          {!isLoading && (
+            <div className="max-w-4xl mx-auto">
+              <div className="columns-1 md:columns-2 gap-4 space-y-4">
+                {filteredPosts.map((post) => (
+                  <div key={post.id} className="break-inside-avoid">
+                    <WallPost content={post.content || ""} tags={post.tags || []} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {!isLoading && filteredPosts.length === 0 && (
             <div className="text-center py-16">
               <p className="text-xl text-muted-foreground">
-                No failures match your search. The universe is suspiciously quiet...
+                {allPosts.length === 0 
+                  ? "No failures shared yet. Be the first to add one to The Wall."
+                  : "No failures match your search. The universe is suspiciously quiet..."}
               </p>
             </div>
           )}
