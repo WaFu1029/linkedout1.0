@@ -15,6 +15,7 @@ interface CreatePostDialogProps {
 }
 
 export function CreatePostDialog({ open, onOpenChange, userId }: CreatePostDialogProps) {
+  const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState("");
@@ -44,6 +45,7 @@ export function CreatePostDialog({ open, onOpenChange, userId }: CreatePostDialo
         .from("posts")
         .insert({
           author_id: userId,
+          title: title.trim() || null,
           content: content.trim(),
           tags: tags.length > 0 ? tags : [],
         })
@@ -60,6 +62,7 @@ export function CreatePostDialog({ open, onOpenChange, userId }: CreatePostDialo
       queryClient.invalidateQueries({ queryKey: ["posts"] });
       
       toast.success("Your failure has been shared!");
+      setTitle("");
       setContent("");
       setTags([]);
       setNewTag("");
@@ -80,6 +83,20 @@ export function CreatePostDialog({ open, onOpenChange, userId }: CreatePostDialo
         </DialogHeader>
 
         <div className="space-y-6 mt-4">
+          {/* Title */}
+          <div>
+            <label className="font-bold text-sm uppercase tracking-wide block mb-2">
+              Title (optional)
+            </label>
+            <Input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Give your failure a title..."
+              className="bg-cream-warm border-[3px] border-foreground text-base font-medium"
+              disabled={isSubmitting}
+            />
+          </div>
+
           {/* Content */}
           <div>
             <label className="font-bold text-sm uppercase tracking-wide block mb-2">
@@ -142,6 +159,7 @@ export function CreatePostDialog({ open, onOpenChange, userId }: CreatePostDialo
             <Button
               variant="outline"
               onClick={() => {
+                setTitle("");
                 setContent("");
                 setTags([]);
                 setNewTag("");

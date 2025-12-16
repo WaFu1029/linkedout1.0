@@ -12,6 +12,7 @@ interface FailurePostProps {
   id: string;
   author: string;
   industry: string;
+  title?: string | null;
   content: string;
   tags: string[];
   timestamp: string;
@@ -35,6 +36,7 @@ export function FailurePost({
   id,
   author,
   industry,
+  title,
   content,
   tags,
   timestamp,
@@ -142,6 +144,11 @@ export function FailurePost({
         </div>
         <span className="text-xs text-muted-foreground font-mono">{timestamp}</span>
       </div>
+
+      {/* Title */}
+      {title && (
+        <h3 className="font-bold text-xl mb-2">{title}</h3>
+      )}
 
       {/* Content */}
       <p className="flex-1 text-base leading-relaxed mb-4">{content}</p>

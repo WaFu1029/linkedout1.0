@@ -17,6 +17,7 @@ interface Post {
   id: string;
   author: string;
   industry: string;
+  title?: string | null;
   content: string;
   tags?: string[];
   timestamp: string;
@@ -143,6 +144,11 @@ export function SwipePostCard({ post, currentUserEmail, comments = [], isMobile 
           <p className="font-bold text-xl">{firstName}</p>
           <p className="text-sm font-semibold text-primary font-mono">{post.industry}</p>
         </div>
+      )}
+
+      {/* Title */}
+      {post.title && (
+        <h2 className="font-bold text-3xl mb-3">{post.title}</h2>
       )}
 
       {/* Content */}

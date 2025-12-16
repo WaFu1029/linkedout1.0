@@ -174,6 +174,7 @@ const Profile = () => {
         id: post.id,
         author: profile?.full_name || profile?.email?.split("@")[0] || "User",
         industry: profile?.industry || "Human Being",
+        title: post.title || null,
         content: post.content,
         tags: post.tags || [],
         timestamp: formatDistanceToNow(new Date(post.created_at), { addSuffix: true }),
@@ -699,6 +700,7 @@ const Profile = () => {
                       id={post.id}
                       author={post.author}
                       industry={post.industry}
+                      title={post.title}
                       content={post.content}
                       tags={post.tags}
                       timestamp={post.timestamp}
