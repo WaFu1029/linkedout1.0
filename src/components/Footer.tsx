@@ -6,12 +6,12 @@ export function Footer() {
       <div className="container mx-auto px-4">
         <div className="grid md:grid-cols-3 gap-8">
           <div>
-            <div className="flex items-center gap-2 mb-4">
-              <span className="text-2xl font-bold">Linked</span>
-              <span className="text-2xl font-bold bg-primary text-primary-foreground px-2">Out</span>
-            </div>
+          <div className="flex items-center gap-0 mb-4">
+  <span className="text-2xl font-bold pr-1">Linked</span>
+  <span className="text-2xl font-bold bg-primary text-primary-foreground pl-1 pr-1.5 py-0.5">Out</span>
+</div>
             <p className="text-sm opacity-80">
-              The anti-LinkedIn. Share your failures, embrace your vulnerabilities, and find community in imperfection.
+              Basically evil Linkedin.
             </p>
           </div>
           <div>
