@@ -668,14 +668,14 @@ const Index = () => {
           <h2 className="text-3xl md:text-4xl font-bold text-center mb-12">
             How it <span className="text-primary">works</span>
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-5xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 max-w-5xl mx-auto">
             {/* Feature 1 - Large */}
-            <Card className="md:col-span-2 p-8 hover:shadow-brutal-hover hover:translate-x-[2px] hover:translate-y-[2px]">
+            <Card className="md:col-span-3 p-8 hover:shadow-brutal-hover hover:translate-x-[2px] hover:translate-y-[2px]">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-12 h-12 bg-primary border-[3px] border-foreground flex items-center justify-center">
                   <Heart className="text-primary-foreground" />
                 </div>
-                <h3 className="text-2xl font-bold">Share Your Failures</h3>
+                <h3 className="text-2xl font-bold">Step 1: Share Your Failures</h3>
               </div>
               <p className="text-muted-foreground text-lg">
                 Post about rejections, mistakes, and moments of vulnerability. Tag them, react with empathy, and let go of the pressure to perform perfection.
@@ -683,37 +683,41 @@ const Index = () => {
             </Card>
 
             {/* Feature 2 - Small */}
-            <Card className="p-8 hover:shadow-brutal-hover hover:translate-x-[2px] hover:translate-y-[2px]">
-              <div className="w-12 h-12 bg-accent border-[3px] border-foreground flex items-center justify-center mb-4">
-                <Users className="text-accent-foreground" />
+            <Card className="md:col-span-2 p-8 hover:shadow-brutal-hover hover:translate-x-[2px] hover:translate-y-[2px]">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 bg-accent border-[3px] border-foreground flex items-center justify-center">
+                  <Users className="text-accent-foreground" />
+                </div>
+                <h3 className="text-2xl font-bold">Step 2: Receive Empathy</h3>
               </div>
-              <h3 className="text-xl font-bold mb-2">No Follower Counts</h3>
-              <p className="text-muted-foreground">
-                No vanity metrics. Just humans connecting over shared experiences.
+              <p className="text-muted-foreground text-lg">
+                Get rewarded for being vulnerable. It's a skill, really.
               </p>
             </Card>
 
             {/* Feature 3 - Small */}
-            <Card className="p-8 hover:shadow-brutal-hover hover:translate-x-[2px] hover:translate-y-[2px]">
-              <div className="w-12 h-12 bg-peach-soft border-[3px] border-foreground flex items-center justify-center mb-4">
-                <Archive />
+            <Card className="md:col-span-2 p-8 hover:shadow-brutal-hover hover:translate-x-[2px] hover:translate-y-[2px]">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 bg-primary border-[3px] border-foreground flex items-center justify-center">
+                  <MessageSquare className="text-primary-foreground" />
+                </div>
+                <h3 className="text-2xl font-bold">Step 3: Find Others</h3>
               </div>
-              <h3 className="text-xl font-bold mb-2">2-Week Visibility</h3>
-              <p className="text-muted-foreground">
-                Posts fade from public view after 2 weeks. Your archive stays private forever.
+              <p className="text-muted-foreground text-lg">
+                This is a social media platform, after all. Just don't do anything illegal (or be a jerk).
               </p>
             </Card>
 
             {/* Feature 4 - Large */}
-            <Card className="md:col-span-2 p-8 hover:shadow-brutal-hover hover:translate-x-[2px] hover:translate-y-[2px]">
+            <Card className="md:col-span-3 p-8 hover:shadow-brutal-hover hover:translate-x-[2px] hover:translate-y-[2px]">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 bg-cream-warm border-[3px] border-foreground flex items-center justify-center">
-                  <MessageSquare />
+                <div className="w-12 h-12 bg-primary border-[3px] border-foreground flex items-center justify-center">
+                  <Archive className="text-primary-foreground" />
                 </div>
-                <h3 className="text-2xl font-bold">The Wall</h3>
+                <h3 className="text-2xl font-bold">Step 4: Get Immortalized in The Wall</h3>
               </div>
               <p className="text-muted-foreground text-lg">
-                An anonymous, permanent archive of all failures ever posted. No names attached—just the failure text and tags. A monument to human imperfection.
+                <strong>The Wall</strong> is an anonymous, permanent archive of all failures ever posted. We keep it here just so we can look back. 
               </p>
             </Card>
           </div>
