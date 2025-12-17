@@ -2,6 +2,7 @@
 CREATE TABLE IF NOT EXISTS public.posts (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   author_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  title TEXT,
   content TEXT NOT NULL,
   tags TEXT[] DEFAULT '{}',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,

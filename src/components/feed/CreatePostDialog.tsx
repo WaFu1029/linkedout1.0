@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -80,6 +80,9 @@ export function CreatePostDialog({ open, onOpenChange, userId }: CreatePostDialo
       <DialogContent className="border-[3px] border-foreground shadow-brutal max-w-2xl">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold">Share Your Failure</DialogTitle>
+          <DialogDescription>
+            Share your failure, setback, or moment of vulnerability with the community.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6 mt-4">
