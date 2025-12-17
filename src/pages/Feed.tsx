@@ -60,12 +60,31 @@ const mockPosts = [
   },
 ];
 
+// Motivational quotes to show between swipes
+const motivationalQuotes = [
+  { text: "Failure is simply the opportunity to begin again, this time more intelligently.", author: "Henry Ford" },
+  { text: "Success is not final, failure is not fatal: it is the courage to continue that counts.", author: "Winston Churchill" },
+  { text: "I have not failed. I've just found 10,000 ways that won't work.", author: "Thomas Edison" },
+  { text: "The only real mistake is the one from which we learn nothing.", author: "Henry Ford" },
+  { text: "Failures are finger posts on the road to achievement.", author: "C.S. Lewis" },
+  { text: "Every adversity carries with it the seed of an equal or greater benefit.", author: "Napoleon Hill" },
+  { text: "It's fine to celebrate success, but it is more important to heed the lessons of failure.", author: "Bill Gates" },
+  { text: "Only those who dare to fail greatly can ever achieve greatly.", author: "Robert F. Kennedy" },
+  { text: "Failure is the condiment that gives success its flavor.", author: "Truman Capote" },
+  { text: "The master has failed more times than the beginner has even tried.", author: "Stephen McCranie" },
+  { text: "Fall seven times, stand up eight.", author: "Japanese Proverb" },
+  { text: "What would you attempt to do if you knew you could not fail?", author: "Robert Schuller" },
+];
+
 const Feed = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [previousIndex, setPreviousIndex] = useState<number | null>(null);
   const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null);
+  const [showQuote, setShowQuote] = useState(false);
+  const [currentQuote, setCurrentQuote] = useState(motivationalQuotes[0]);
+  const [pendingIndex, setPendingIndex] = useState<number | null>(null);
   const [showProfileDrawer, setShowProfileDrawer] = useState(false);
   const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
   const [touchEnd, setTouchEnd] = useState<{ x: number; y: number } | null>(null);
@@ -163,33 +182,50 @@ const Feed = () => {
   const previousPostProfile = previousPost ? profiles.find((p) => p.id === previousPost?.author_id || p.email === previousPost?.author_email) : null;
 
   const goNext = () => {
-    if (currentIndex < visiblePosts.length - 1 && !slideDirection) {
+    if (currentIndex < visiblePosts.length - 1 && !slideDirection && !showQuote) {
       setShowProfileDrawer(false);
       setPreviousIndex(currentIndex);
       setSlideDirection('left');
-      setCurrentIndex((prev) => prev + 1);
+      setPendingIndex(currentIndex + 1);
+      // Pick a random quote
+      setCurrentQuote(motivationalQuotes[Math.floor(Math.random() * motivationalQuotes.length)]);
     }
   };
 
   const goPrev = () => {
-    if (currentIndex > 0 && !slideDirection) {
+    if (currentIndex > 0 && !slideDirection && !showQuote) {
       setShowProfileDrawer(false);
       setPreviousIndex(currentIndex);
       setSlideDirection('right');
-      setCurrentIndex((prev) => prev - 1);
+      setPendingIndex(currentIndex - 1);
+      // Pick a random quote
+      setCurrentQuote(motivationalQuotes[Math.floor(Math.random() * motivationalQuotes.length)]);
     }
   };
 
-  // Clear animation state after transition completes
+  // Handle the transition sequence: slide out -> show quote -> slide in new card
   useEffect(() => {
-    if (slideDirection) {
-      const timer = setTimeout(() => {
+    if (slideDirection && pendingIndex !== null) {
+      // First, wait for slide-out animation to complete
+      const slideOutTimer = setTimeout(() => {
+        // Hide the old card and show the quote
         setPreviousIndex(null);
         setSlideDirection(null);
+        setShowQuote(true);
+        
+        // After showing quote for 2 seconds, bring in the new card
+        const quoteTimer = setTimeout(() => {
+          setShowQuote(false);
+          setCurrentIndex(pendingIndex);
+          setPendingIndex(null);
+        }, 2000);
+        
+        return () => clearTimeout(quoteTimer);
       }, 500);
-      return () => clearTimeout(timer);
+      
+      return () => clearTimeout(slideOutTimer);
     }
-  }, [slideDirection, currentIndex]);
+  }, [slideDirection, pendingIndex]);
 
   // Touch handlers for mobile swipe
   const minSwipeDistance = 50;
@@ -232,12 +268,12 @@ const Feed = () => {
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "ArrowRight" && !slideDirection) goNext();
-      if (e.key === "ArrowLeft" && !slideDirection) goPrev();
+      if (e.key === "ArrowRight" && !slideDirection && !showQuote) goNext();
+      if (e.key === "ArrowLeft" && !slideDirection && !showQuote) goPrev();
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [currentIndex, visiblePosts.length, slideDirection]);
+  }, [currentIndex, visiblePosts.length, slideDirection, showQuote]);
 
   if (postsLoading) {
     return (
@@ -305,7 +341,7 @@ const Feed = () => {
         <div className="flex items-center pr-4">
           <button
             onClick={goPrev}
-            disabled={currentIndex === 0 || !!slideDirection}
+            disabled={currentIndex === 0 || !!slideDirection || showQuote}
             className="p-3 bg-background border-[3px] border-foreground shadow-brutal hover:shadow-brutal-hover hover:translate-x-[2px] hover:translate-y-[2px] transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:translate-x-0 disabled:hover:translate-y-0 disabled:hover:shadow-brutal"
           >
             <ChevronLeft className="w-6 h-6" />
@@ -330,6 +366,23 @@ const Feed = () => {
 
           {/* Post and Profile Cards with transition */}
           <div className="flex-1 relative overflow-hidden">
+            {/* Motivational Quote Overlay */}
+            {showQuote && (
+              <div className="absolute inset-0 flex items-center justify-center z-10 animate-in fade-in duration-300">
+                <div className="max-w-2xl text-center px-8">
+                  <div className="bg-primary/10 border-[3px] border-foreground shadow-brutal p-8 md:p-12">
+                    <Sparkles className="w-8 h-8 mx-auto mb-4 text-primary" />
+                    <p className="text-2xl md:text-3xl font-bold leading-relaxed mb-4">
+                      "{currentQuote.text}"
+                    </p>
+                    <p className="text-lg font-semibold text-muted-foreground">
+                      — {currentQuote.author}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Outgoing card (previous post sliding out) */}
             {previousIndex !== null && previousPost && (
               <div
@@ -356,44 +409,45 @@ const Feed = () => {
             )}
 
             {/* Incoming card (current post sliding in) */}
-            <div
-              className={`h-full flex gap-6 transition-transform duration-500 ease-out`}
-              style={{ 
-                transform: slideDirection ? 'translateX(0)' : 'translateX(0)',
-                // Use CSS custom property for initial position
-              }}
-              ref={(el) => {
-                if (el && slideDirection && previousIndex !== null) {
-                  // Set initial off-screen position immediately
-                  el.style.transition = 'none';
-                  el.style.transform = getInitialTransform();
-                  // Force reflow
-                  el.offsetHeight;
-                  // Enable transition and animate to center
-                  el.style.transition = 'transform 500ms ease-out';
-                  el.style.transform = 'translateX(0)';
-                }
-              }}
-            >
-              {/* Post Section - 65% */}
-              <div className="w-[65%] flex flex-col">
-                {currentPost && (
-                  <SwipePostCard 
-                    post={currentPost} 
-                    currentUserEmail={user?.email} 
-                    comments={[]} 
-                  />
-                )}
-              </div>
+            {!showQuote && (
+              <div
+                className={`h-full flex gap-6 transition-transform duration-500 ease-out ${!slideDirection && !previousIndex ? 'animate-in fade-in slide-in-from-bottom-4 duration-500' : ''}`}
+                style={{ 
+                  transform: slideDirection ? 'translateX(0)' : 'translateX(0)',
+                }}
+                ref={(el) => {
+                  if (el && slideDirection && previousIndex !== null) {
+                    // Set initial off-screen position immediately
+                    el.style.transition = 'none';
+                    el.style.transform = getInitialTransform();
+                    // Force reflow
+                    el.offsetHeight;
+                    // Enable transition and animate to center
+                    el.style.transition = 'transform 500ms ease-out';
+                    el.style.transform = 'translateX(0)';
+                  }
+                }}
+              >
+                {/* Post Section - 65% */}
+                <div className="w-[65%] flex flex-col">
+                  {currentPost && (
+                    <SwipePostCard 
+                      post={currentPost} 
+                      currentUserEmail={user?.email} 
+                      comments={[]} 
+                    />
+                  )}
+                </div>
 
-              {/* Profile Section - 35% */}
-              <div className="w-[35%] flex flex-col">
-                <ProfileSidebar 
-                  profile={currentPostProfile || null} 
-                  post={currentPost || null} 
-                />
+                {/* Profile Section - 35% */}
+                <div className="w-[35%] flex flex-col">
+                  <ProfileSidebar 
+                    profile={currentPostProfile || null} 
+                    post={currentPost || null} 
+                  />
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
 
@@ -401,7 +455,7 @@ const Feed = () => {
         <div className="flex items-center pl-4">
           <button
             onClick={goNext}
-            disabled={currentIndex === visiblePosts.length - 1 || !!slideDirection}
+            disabled={currentIndex === visiblePosts.length - 1 || !!slideDirection || showQuote}
             className="p-3 bg-background border-[3px] border-foreground shadow-brutal hover:shadow-brutal-hover hover:translate-x-[2px] hover:translate-y-[2px] transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:translate-x-0 disabled:hover:translate-y-0 disabled:hover:shadow-brutal"
           >
             <ChevronRight className="w-6 h-6" />
@@ -433,6 +487,23 @@ const Feed = () => {
 
         {/* Post Cards with Animation */}
         <div className="h-full pt-20 pb-16 px-4 overflow-hidden relative">
+          {/* Motivational Quote Overlay - Mobile */}
+          {showQuote && (
+            <div className="absolute inset-0 flex items-center justify-center z-10 animate-in fade-in duration-300 px-4">
+              <div className="w-full max-w-md text-center">
+                <div className="bg-primary/10 border-[3px] border-foreground shadow-brutal p-6">
+                  <Sparkles className="w-6 h-6 mx-auto mb-3 text-primary" />
+                  <p className="text-xl font-bold leading-relaxed mb-3">
+                    "{currentQuote.text}"
+                  </p>
+                  <p className="text-sm font-semibold text-muted-foreground">
+                    — {currentQuote.author}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Outgoing card (previous post sliding out) - Mobile */}
           {previousIndex !== null && previousPost && (
             <div
@@ -449,27 +520,29 @@ const Feed = () => {
           )}
 
           {/* Incoming card (current post sliding in) - Mobile */}
-          <div
-            className="h-full transition-transform duration-500 ease-out"
-            ref={(el) => {
-              if (el && slideDirection && previousIndex !== null) {
-                el.style.transition = 'none';
-                el.style.transform = getInitialTransform();
-                el.offsetHeight;
-                el.style.transition = 'transform 500ms ease-out';
-                el.style.transform = 'translateX(0)';
-              }
-            }}
-          >
-            {currentPost && (
-              <SwipePostCard 
-                post={currentPost} 
-                currentUserEmail={user?.email} 
-                comments={[]} 
-                isMobile 
-              />
-            )}
-          </div>
+          {!showQuote && (
+            <div
+              className={`h-full transition-transform duration-500 ease-out ${!slideDirection && !previousIndex ? 'animate-in fade-in slide-in-from-bottom-4 duration-500' : ''}`}
+              ref={(el) => {
+                if (el && slideDirection && previousIndex !== null) {
+                  el.style.transition = 'none';
+                  el.style.transform = getInitialTransform();
+                  el.offsetHeight;
+                  el.style.transition = 'transform 500ms ease-out';
+                  el.style.transform = 'translateX(0)';
+                }
+              }}
+            >
+              {currentPost && (
+                <SwipePostCard 
+                  post={currentPost} 
+                  currentUserEmail={user?.email} 
+                  comments={[]} 
+                  isMobile 
+                />
+              )}
+            </div>
+          )}
         </div>
 
         {/* Swipe up hint */}
