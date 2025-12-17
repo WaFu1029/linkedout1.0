@@ -54,7 +54,8 @@ export function CreatePostDialog({ open, onOpenChange, userId }: CreatePostDialo
 
       if (error) {
         console.error("Error creating post:", error);
-        toast.error("Failed to share your failure. Try again!");
+        console.error("Error details:", JSON.stringify(error, null, 2));
+        toast.error(`Failed to share your failure: ${error.message || 'Unknown error'}`);
         return;
       }
 
