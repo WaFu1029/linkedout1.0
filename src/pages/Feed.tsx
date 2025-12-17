@@ -64,9 +64,8 @@ const Feed = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [swipeDirection, setSwipeDirection] = useState(0);
-  const [entryDirection, setEntryDirection] = useState<1 | -1 | 0>(0);
-  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [previousIndex, setPreviousIndex] = useState<number | null>(null);
+  const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null);
   const [showProfileDrawer, setShowProfileDrawer] = useState(false);
   const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
   const [touchEnd, setTouchEnd] = useState<{ x: number; y: number } | null>(null);
@@ -158,50 +157,39 @@ const Feed = () => {
 
   const currentPost = visiblePosts[currentIndex];
   const currentPostProfile = profiles.find((p) => p.id === currentPost?.author_id || p.email === currentPost?.author_email);
+  
+  // Get previous post data for animation
+  const previousPost = previousIndex !== null ? visiblePosts[previousIndex] : null;
+  const previousPostProfile = previousPost ? profiles.find((p) => p.id === previousPost?.author_id || p.email === previousPost?.author_email) : null;
 
   const goNext = () => {
-    if (currentIndex < visiblePosts.length - 1 && !isTransitioning) {
-      setIsTransitioning(true);
+    if (currentIndex < visiblePosts.length - 1 && !slideDirection) {
       setShowProfileDrawer(false);
-      // Slide current cards out to the left
-      setSwipeDirection(1);
-      setEntryDirection(-1); // New cards will enter from right
-      // Wait for slide-out animation to complete
-      setTimeout(() => {
-        setCurrentIndex((prev) => prev + 1);
-        // New cards start off-screen to the right
-        setSwipeDirection(-1);
-        // Animate new cards from right to center
-        setTimeout(() => {
-          setSwipeDirection(0);
-          setEntryDirection(0);
-          setIsTransitioning(false);
-        }, 50);
-      }, 500);
+      setPreviousIndex(currentIndex);
+      setSlideDirection('left');
+      setCurrentIndex((prev) => prev + 1);
     }
   };
 
   const goPrev = () => {
-    if (currentIndex > 0 && !isTransitioning) {
-      setIsTransitioning(true);
+    if (currentIndex > 0 && !slideDirection) {
       setShowProfileDrawer(false);
-      // Slide current cards out to the right
-      setSwipeDirection(-1);
-      setEntryDirection(1); // New cards will enter from left
-      // Wait for slide-out animation to complete
-      setTimeout(() => {
-        setCurrentIndex((prev) => prev - 1);
-        // New cards start off-screen to the left
-        setSwipeDirection(1);
-        // Animate new cards from left to center
-        setTimeout(() => {
-          setSwipeDirection(0);
-          setEntryDirection(0);
-          setIsTransitioning(false);
-        }, 50);
-      }, 500);
+      setPreviousIndex(currentIndex);
+      setSlideDirection('right');
+      setCurrentIndex((prev) => prev - 1);
     }
   };
+
+  // Clear animation state after transition completes
+  useEffect(() => {
+    if (slideDirection) {
+      const timer = setTimeout(() => {
+        setPreviousIndex(null);
+        setSlideDirection(null);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [slideDirection, currentIndex]);
 
   // Touch handlers for mobile swipe
   const minSwipeDistance = 50;
@@ -244,14 +232,12 @@ const Feed = () => {
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "ArrowRight" && !isTransitioning) goNext();
-      if (e.key === "ArrowLeft" && !isTransitioning) goPrev();
+      if (e.key === "ArrowRight" && !slideDirection) goNext();
+      if (e.key === "ArrowLeft" && !slideDirection) goPrev();
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [currentIndex, visiblePosts.length, isTransitioning]);
-
-  // Note: swipeDirection is now reset in goNext/goPrev after index change
+  }, [currentIndex, visiblePosts.length, slideDirection]);
 
   if (postsLoading) {
     return (
@@ -290,6 +276,25 @@ const Feed = () => {
     );
   }
 
+  // Helper function to get transform style for cards
+  const getCardTransform = (isOutgoing: boolean) => {
+    if (!slideDirection) return 'translateX(0)';
+    
+    if (isOutgoing) {
+      // Outgoing card slides out
+      return slideDirection === 'left' ? 'translateX(-100%)' : 'translateX(100%)';
+    } else {
+      // Incoming card slides in from opposite direction
+      return 'translateX(0)';
+    }
+  };
+
+  const getInitialTransform = () => {
+    if (!slideDirection) return 'translateX(0)';
+    // Incoming card starts off-screen
+    return slideDirection === 'left' ? 'translateX(100%)' : 'translateX(-100%)';
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -300,7 +305,7 @@ const Feed = () => {
         <div className="flex items-center pr-4">
           <button
             onClick={goPrev}
-            disabled={currentIndex === 0}
+            disabled={currentIndex === 0 || !!slideDirection}
             className="p-3 bg-background border-[3px] border-foreground shadow-brutal hover:shadow-brutal-hover hover:translate-x-[2px] hover:translate-y-[2px] transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:translate-x-0 disabled:hover:translate-y-0 disabled:hover:shadow-brutal"
           >
             <ChevronLeft className="w-6 h-6" />
@@ -323,29 +328,70 @@ const Feed = () => {
             )}
           </div>
 
-          {/* Post and Profile Cards with transition - moving together */}
+          {/* Post and Profile Cards with transition */}
           <div className="flex-1 relative overflow-hidden">
+            {/* Outgoing card (previous post sliding out) */}
+            {previousIndex !== null && previousPost && (
+              <div
+                className="absolute inset-0 flex gap-6 transition-transform duration-500 ease-out"
+                style={{ transform: getCardTransform(true) }}
+              >
+                {/* Post Section - 65% */}
+                <div className="w-[65%] flex flex-col">
+                  <SwipePostCard 
+                    post={previousPost} 
+                    currentUserEmail={user?.email} 
+                    comments={[]} 
+                  />
+                </div>
+
+                {/* Profile Section - 35% */}
+                <div className="w-[35%] flex flex-col">
+                  <ProfileSidebar 
+                    profile={previousPostProfile || null} 
+                    post={previousPost || null} 
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Incoming card (current post sliding in) */}
             <div
-              key={`${currentIndex}-${entryDirection}`}
-              className="h-full flex gap-6 transition-transform duration-500 ease-in-out"
-              style={{
-                transform: swipeDirection === 1 
-                  ? "translateX(-100%)" 
-                  : swipeDirection === -1 
-                  ? "translateX(100%)" 
-                  : "translateX(0)",
+              className={`h-full flex gap-6 transition-transform duration-500 ease-out`}
+              style={{ 
+                transform: slideDirection ? 'translateX(0)' : 'translateX(0)',
+                // Use CSS custom property for initial position
+              }}
+              ref={(el) => {
+                if (el && slideDirection && previousIndex !== null) {
+                  // Set initial off-screen position immediately
+                  el.style.transition = 'none';
+                  el.style.transform = getInitialTransform();
+                  // Force reflow
+                  el.offsetHeight;
+                  // Enable transition and animate to center
+                  el.style.transition = 'transform 500ms ease-out';
+                  el.style.transform = 'translateX(0)';
+                }
               }}
             >
               {/* Post Section - 65% */}
               <div className="w-[65%] flex flex-col">
                 {currentPost && (
-                  <SwipePostCard post={currentPost} currentUserEmail={user?.email} comments={[]} />
+                  <SwipePostCard 
+                    post={currentPost} 
+                    currentUserEmail={user?.email} 
+                    comments={[]} 
+                  />
                 )}
               </div>
 
               {/* Profile Section - 35% */}
               <div className="w-[35%] flex flex-col">
-                <ProfileSidebar profile={currentPostProfile || null} post={currentPost || null} />
+                <ProfileSidebar 
+                  profile={currentPostProfile || null} 
+                  post={currentPost || null} 
+                />
               </div>
             </div>
           </div>
@@ -355,7 +401,7 @@ const Feed = () => {
         <div className="flex items-center pl-4">
           <button
             onClick={goNext}
-            disabled={currentIndex === visiblePosts.length - 1}
+            disabled={currentIndex === visiblePosts.length - 1 || !!slideDirection}
             className="p-3 bg-background border-[3px] border-foreground shadow-brutal hover:shadow-brutal-hover hover:translate-x-[2px] hover:translate-y-[2px] transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:translate-x-0 disabled:hover:translate-y-0 disabled:hover:shadow-brutal"
           >
             <ChevronRight className="w-6 h-6" />
@@ -385,21 +431,43 @@ const Feed = () => {
           )}
         </div>
 
-        {/* Post Card with Animation */}
-        <div className="h-full pt-20 pb-16 px-4 overflow-hidden">
+        {/* Post Cards with Animation */}
+        <div className="h-full pt-20 pb-16 px-4 overflow-hidden relative">
+          {/* Outgoing card (previous post sliding out) - Mobile */}
+          {previousIndex !== null && previousPost && (
+            <div
+              className="absolute inset-0 pt-20 pb-16 px-4 transition-transform duration-500 ease-out"
+              style={{ transform: getCardTransform(true) }}
+            >
+              <SwipePostCard 
+                post={previousPost} 
+                currentUserEmail={user?.email} 
+                comments={[]} 
+                isMobile 
+              />
+            </div>
+          )}
+
+          {/* Incoming card (current post sliding in) - Mobile */}
           <div
-            key={`${currentIndex}-${entryDirection}`}
-            className="h-full transition-transform duration-500 ease-in-out"
-            style={{
-              transform: swipeDirection === 1 
-                ? "translateX(-100%)" 
-                : swipeDirection === -1 
-                ? "translateX(100%)" 
-                : "translateX(0)",
+            className="h-full transition-transform duration-500 ease-out"
+            ref={(el) => {
+              if (el && slideDirection && previousIndex !== null) {
+                el.style.transition = 'none';
+                el.style.transform = getInitialTransform();
+                el.offsetHeight;
+                el.style.transition = 'transform 500ms ease-out';
+                el.style.transform = 'translateX(0)';
+              }
             }}
           >
             {currentPost && (
-              <SwipePostCard post={currentPost} currentUserEmail={user?.email} comments={[]} isMobile />
+              <SwipePostCard 
+                post={currentPost} 
+                currentUserEmail={user?.email} 
+                comments={[]} 
+                isMobile 
+              />
             )}
           </div>
         </div>
