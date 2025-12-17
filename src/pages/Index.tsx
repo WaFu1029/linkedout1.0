@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Link } from "react-router-dom";
 import { ArrowRight, Heart, Users, Archive, MessageSquare } from "lucide-react";
 import { useTheme } from "next-themes";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, LineChart, Line, Legend, ReferenceLine } from "recharts";
 import {
   ChartConfig,
   ChartContainer,
@@ -281,10 +281,116 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
+// Correlation data: upward social comparison vs appearance anxiety (r=0.546)
+const correlationData = [
+  { usc: 1, anxiety: 2.1 },
+  { usc: 5.5, anxiety: 5.0 },
+];
+
+const correlationConfig = {
+  anxiety: {
+    label: "Appearance Anxiety",
+    color: "#ffffff",
+  },
+} satisfies ChartConfig;
+
 const Index = () => {
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
+  const barChartContainerClassName = `border-[3px] ${isDark ? 'border-foreground/30' : 'border-white/30'} w-full md:w-[500px] h-[500px] p-4 flex-shrink-0 flex flex-col`;
+  const barChartClassName = `flex-1 w-full min-h-0 ${isDark ? '[&_.recharts-cartesian-axis-tick_text]:fill-foreground' : '[&_.recharts-cartesian-axis-tick_text]:fill-white'}`;
+  const statSquareClassName = `border-[3px] border-background ${isDark ? 'bg-card' : 'bg-white'} p-4 md:p-6 flex flex-col items-center justify-center flex-shrink-0 w-full md:w-[200px] h-[500px] box-border`;
+  const statValueClassName = `text-6xl md:text-7xl font-bold ${isDark ? 'text-primary' : 'text-[#f97316]'} mb-4`;
+  const lineChartContainerClassName = `border-[3px] ${isDark ? 'border-foreground/30' : 'border-white/30'} flex-1 min-w-0 w-full h-[500px] p-4 flex flex-col`;
+  const lineChartClassName = `relative flex-1 w-full h-full aspect-none ${isDark ? '[&_.recharts-cartesian-axis-tick_text]:fill-foreground' : '[&_.recharts-cartesian-axis-tick_text]:fill-white'}`;
+  const arrowBodyClassName = isDark ? "bg-foreground" : "bg-white";
+  const arrowHeadClassName = `w-0 h-0 border-l-[35px] ${isDark ? 'border-l-foreground' : 'border-l-white'} border-y-[18px] border-y-transparent flex-shrink-0`;
+  const whySectionClassName = `py-16 md:py-24 ${isDark ? 'bg-primary' : 'bg-[#f97316]'}`;
   const [showExplosion, setShowExplosion] = useState(false);
   const [showNewText, setShowNewText] = useState(false);
   const [hasTypedFirstText, setHasTypedFirstText] = useState(false);
+  const [barChartVisible, setBarChartVisible] = useState(false);
+  const [lineChartVisible, setLineChartVisible] = useState(false);
+  const [statVisible, setStatVisible] = useState(false);
+  const [statValue, setStatValue] = useState(0);
+  const barChartRef = useRef<HTMLDivElement>(null);
+  const lineChartRef = useRef<HTMLDivElement>(null);
+  const statRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const barObserver = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setBarChartVisible(true);
+            barObserver.disconnect();
+          }
+        });
+      },
+      { threshold: 0.1 }
+    );
+
+    const lineObserver = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setLineChartVisible(true);
+            lineObserver.disconnect();
+          }
+        });
+      },
+      { threshold: 0.1 }
+    );
+
+    const statObserver = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setStatVisible(true);
+            statObserver.disconnect();
+          }
+        });
+      },
+      { threshold: 0.1 }
+    );
+
+    if (barChartRef.current) {
+      barObserver.observe(barChartRef.current);
+    }
+    if (lineChartRef.current) {
+      lineObserver.observe(lineChartRef.current);
+    }
+    if (statRef.current) {
+      statObserver.observe(statRef.current);
+    }
+
+    return () => {
+      barObserver.disconnect();
+      lineObserver.disconnect();
+      statObserver.disconnect();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!statVisible) return;
+
+    const targetValue = 68;
+    const duration = 1500; // 1.5 seconds
+    const steps = targetValue;
+    const stepDuration = duration / steps;
+    let currentStep = 0;
+
+    const interval = setInterval(() => {
+      currentStep++;
+      if (currentStep <= targetValue) {
+        setStatValue(currentStep);
+      } else {
+        clearInterval(interval);
+      }
+    }, stepDuration);
+
+    return () => clearInterval(interval);
+  }, [statVisible]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -351,75 +457,81 @@ const Index = () => {
       </section>
 
       {/* Why Section */}
-      <section className="py-16 md:py-24 bg-[#f97316]">
+      <section className={whySectionClassName}>
         <div className="container mx-auto px-4">
-          <div className="max-w-3xl text-left pl-4 md:pl-8">
-            <h2 className="text-3xl md:text-4xl font-bold mb-8 text-background">
-              Why?
+          <div className="max-w-3xl text-left pl-4 md:pl-8 mb-8">
+            <h2 className="text-3xl md:text-4xl font-bold text-background">
+              Why? <br /> <br />
+              Because social media causes social anxiety.
             </h2>
-            
-            {/* Chart */}
-            <div className="max-w-4xl">
-              <h3 className="text-xl md:text-2xl font-bold mb-4 text-background">
-                The Effects of Social Media on Mental Health
-              </h3>
-              <div className="flex flex-col md:flex-row gap-6 items-start">
-                <div className="flex-1">
-                  <ChartContainer config={chartConfig} className="h-[400px] w-full [&_.recharts-cartesian-axis-tick_text]:fill-white">
-                <BarChart
+          </div>
+            <div className="pl-4 md:pl-8 pr-4 md:pr-8">
+              <div className="flex flex-col md:flex-row gap-4 md:items-stretch">
+              <div ref={barChartRef} className={barChartContainerClassName}>
+  <h3 className="text-lg md:text-xl font-bold mb-2 text-background flex-shrink-0">
+    Social Media Users Report Feelings of Loneliness and Inadequacy
+  </h3>
+  <ChartContainer 
+    config={chartConfig} 
+    className={barChartClassName}
+  >
+  <BarChart
                   data={chartData}
                   margin={{
-                    left: 12,
-                    right: 12,
-                    top: 12,
-                    bottom: 40,
+                    left: 0,
+                    right: 8,
+                    top: 30,
+                    bottom: 10,
                   }}
                 >
-                  <CartesianGrid vertical={false} stroke="rgba(255, 255, 255, 0.3)" />
+                  <CartesianGrid vertical={false} stroke={isDark ? "hsla(270, 30%, 92%, 0.3)" : "rgba(255, 255, 255, 0.3)"} />
                   <XAxis
                     dataKey="category"
                     tickLine={false}
                     axisLine={false}
                     tickMargin={8}
-                    tick={{ fill: "#ffffff", fontSize: 12 }}
+                    tick={{ fill: isDark ? "hsl(270, 30%, 92%)" : "#ffffff", fontSize: 12 }}
                     height={60}
                     interval={0}
                   />
                   <YAxis
                     tickLine={false}
                     axisLine={false}
-                    tickMargin={8}
-                    tick={{ fill: "#ffffff", fontSize: 12 }}
+                    tickMargin={4}
+                    tick={{ fill: isDark ? "hsl(270, 30%, 92%)" : "#ffffff", fontSize: 11 }}
                     domain={[0, 50]}
                     label={{ 
                       value: "Percentage of Users", 
                       angle: -90, 
                       position: "insideLeft", 
-                      fill: "#ffffff",
-                      style: { textAnchor: "middle" }
+                      fill: isDark ? "hsl(270, 30%, 92%)" : "#ffffff",
+                      style: { textAnchor: "middle", fontSize: "11px" }
                     }}
-                    width={80}
+                    width={60}
                   />
                   <ChartTooltip
                     cursor={false}
                     content={<ChartTooltipContent 
                       indicator="dot"
                       formatter={(value, name, props) => [
-                        `${value}%`,
+                        value + '%',
                         props.payload.description
                       ]}
                     />}
                   />
                   <Bar
                     dataKey="percentage"
-                    fill="#ffffff"
+                    fill={isDark ? "hsl(270, 30%, 92%)" : "#ffffff"}
                     radius={[4, 4, 0, 0]}
+                    isAnimationActive={barChartVisible}
+                    animationBegin={0}
+                    animationDuration={1000}
                     label={{ 
                       position: "center", 
-                      fill: "#f97316", 
+                      fill: isDark ? "hsl(270, 60%, 65%)" : "#f97316", 
                       fontSize: 20, 
                       fontWeight: "bold",
-                      formatter: (value: number) => `${value}%`
+                      formatter: (value: number) => value + '%'
                     }}
                   />
                 </BarChart>
@@ -427,18 +539,127 @@ const Index = () => {
                 </div>
                 
                 {/* Stats Square */}
-                <div className="border-[3px] border-background bg-white p-6 md:p-8 flex flex-col items-center justify-center min-w-[200px] md:min-w-[250px]">
-                  <div className="text-6xl md:text-7xl font-bold text-[#f97316] mb-4">
-                    67%
+                <div ref={statRef} className={statSquareClassName}>
+                <div className={statValueClassName}>
+                    {statValue}%
                   </div>
                   <p className="text-sm md:text-base text-foreground text-center leading-relaxed">
-                    Studies with significant SM–mental health link. Proportion of adult studies in global meta‑analysis (2010–2020).
+                    Of studies on social media from 2010–2022 report a significant negative association with mental health.
                   </p>
                 </div>
-              </div>
+                
+                {/* Correlation Line Graph */}
+                {/* Correlation Line Graph */}
+                <div ref={lineChartRef} className={lineChartContainerClassName}>
+  <div className="flex-shrink-0">
+    <h3 className="text-lg md:text-xl font-bold mb-1 text-background">
+      Social Media Use Correlates with Social Comparison and Appearance Anxiety
+    </h3>
+    <p className="text-xs text-background/90 leading-tight">
+    </p>
+  </div>
+  <div className="relative flex-1 w-full min-h-0 h-full">
+    <ChartContainer 
+      config={correlationConfig} 
+      className={lineChartClassName + ' relative h-full'}
+      style={{ aspectRatio: 'auto' }}
+    >
+  <LineChart
+  data={correlationData}
+  margin={{
+    left: 12,
+    right: 12,
+    top: 12,
+    bottom: 0,
+  }}
+  style={{ overflow: 'visible' }}
+>
+<CartesianGrid stroke={isDark ? "hsla(270, 30%, 92%, 0.3)" : "rgba(255, 255, 255, 0.3)"} strokeWidth={1} horizontalCoordinatesGenerator={(props) => [0, 1, 2, 3, 4, 5, 6].map(i => props.offset.top + (i * (props.height - props.offset.top) / 6))} verticalCoordinatesGenerator={(props) => [0, 1, 2, 3, 4, 5, 6].map(i => props.offset.left + (i * (props.width - props.offset.left - props.offset.right) / 6))} />
+<XAxis
+        dataKey="usc"
+        tickLine={false}
+        axisLine={false}
+        tick={false}
+        height={1}
+        domain={[1, 7]}
+        type="number"
+      />
+      <YAxis
+        tickLine={false}
+        axisLine={false}
+        tick={{ fontSize: 0 }}
+        width={1}
+        domain={[2, 7]}
+        tickCount={6}
+      />
+      <ChartTooltip
+        cursor={false}
+        content={<ChartTooltipContent 
+          indicator="dot"
+          formatter={() => ["Correlation: r=0.546, p<0.01", ""]}
+        />}
+      />
+      <Line
+        type="linear"
+        dataKey="anxiety"
+        stroke="transparent"
+        strokeWidth={0}
+        dot={false}
+        activeDot={false}
+        isAnimationActive={lineChartVisible}
+        animationBegin={0}
+        animationDuration={1000}
+      />
+    </LineChart>
+    {/* Arrow overlay - positioned to match chart plot area */}
+    <div 
+      className="absolute pointer-events-none overflow-hidden z-10"
+      style={{
+        left: '12px',
+        right: '12px',
+        top: '12px',
+        bottom: '0',
+      }}
+    >
+      {/* Full arrow with body and head - starts at bottom-left corner, stops before top-right */}
+      <div 
+        className={'absolute pointer-events-none transition-opacity duration-1000 ' + (lineChartVisible ? 'opacity-100' : 'opacity-0')}
+        style={{
+          left: '0',
+          bottom: '0',
+          width: '80%',
+          height: '18px',
+          transform: lineChartVisible ? 'rotate(-38deg)' : 'rotate(-38deg) scaleX(0)',
+          transformOrigin: '0 100%',
+          transition: 'transform 1s ease-out',
+          display: 'flex',
+          alignItems: 'center',
+        }}
+      >
+        {/* Arrow body */}
+        <div 
+          className={arrowBodyClassName}
+          style={{
+            width: 'calc(100% - 35px)',
+            height: '18px',
+            flexShrink: 0,
+          }}
+        />
+        {/* Arrow head */}
+        <div 
+          className={arrowHeadClassName}
+          style={{
+            flexShrink: 0,
+          }}
+        />
+      </div>
+    </div>
+  </ChartContainer>
+  </div>
+</div>
+            </div>
             </div>
           </div>
-        </div>
       </section>
 
       {/* Features Bento Grid */}
@@ -500,7 +721,7 @@ const Index = () => {
       </section>
 
       {/* CTA Section */}
-      <section className="py-16 md:py-24 bg-primary">
+      <section className={`py-16 md:py-24 ${isDark ? 'bg-primary' : 'bg-[#f97316]'}`}>
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center text-primary-foreground">
             <h2 className="text-3xl md:text-5xl font-bold mb-6">
