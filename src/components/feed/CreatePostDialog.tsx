@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,7 +8,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
 
 interface CreatePostDialogProps {
@@ -25,6 +24,7 @@ export function CreatePostDialog({ open, onOpenChange, userId }: CreatePostDialo
   const [tagPopoverOpen, setTagPopoverOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const queryClient = useQueryClient();
+  const tagInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch all unique tags from existing posts
   const { data: existingTags = [] } = useQuery({
@@ -216,82 +216,109 @@ export function CreatePostDialog({ open, onOpenChange, userId }: CreatePostDialo
                 </span>
               ))}
             </div>
-            <Popover open={tagPopoverOpen} onOpenChange={setTagPopoverOpen}>
-              <PopoverTrigger asChild>
-                <div className="flex gap-2 max-w-xs">
-                  <Input
-                    value={newTag}
-                    onChange={(e) => handleTagInputChange(e.target.value)}
-                    onKeyDown={handleTagInputKeyDown}
-                    onFocus={() => newTag.trim() && setTagPopoverOpen(true)}
-                    placeholder="Search or add tag..."
-                    className="shadow-none"
-                    disabled={isSubmitting}
-                  />
-                  <Button
-                    onClick={() => addTag()}
-                    className="border-[3px] border-foreground shadow-none"
-                    type="button"
-                    disabled={isSubmitting || !newTag.trim()}
-                  >
-                    <Plus className="w-4 h-4" />
-                  </Button>
-                </div>
-              </PopoverTrigger>
-              {newTag.trim() && (
-                <PopoverContent 
-                  className="w-[var(--radix-popover-trigger-width)] p-0 border-[3px] border-foreground"
-                  align="start"
+            <Popover open={tagPopoverOpen && newTag.trim().length > 0} onOpenChange={setTagPopoverOpen}>
+              <div className="flex gap-2 max-w-xs">
+                <PopoverTrigger asChild>
+                  <div className="flex-1 relative" style={{ pointerEvents: 'auto' }}>
+                    <Input
+                      ref={tagInputRef}
+                      value={newTag}
+                      onChange={(e) => {
+                        handleTagInputChange(e.target.value);
+                      }}
+                      onKeyDown={(e) => {
+                        handleTagInputKeyDown(e);
+                      }}
+                      onFocus={() => newTag.trim() && setTagPopoverOpen(true)}
+                      onBlur={(e) => {
+                        // Delay closing to allow clicks on popover items
+                        setTimeout(() => {
+                          if (!e.currentTarget.contains(document.activeElement)) {
+                            setTagPopoverOpen(false);
+                          }
+                        }, 200);
+                      }}
+                      placeholder="Search or add tag..."
+                      className="shadow-none w-full"
+                      disabled={isSubmitting}
+                      autoComplete="off"
+                      style={{ pointerEvents: 'auto' }}
+                    />
+                  </div>
+                </PopoverTrigger>
+                <Button
+                  onClick={() => addTag()}
+                  className="border-[3px] border-foreground shadow-none"
+                  type="button"
+                  disabled={isSubmitting || !newTag.trim()}
                 >
-                  <Command>
-                    <CommandList>
-                      <CommandEmpty>
-                        {exactMatch ? (
-                          <div className="py-2 text-sm text-muted-foreground">
-                            Press Enter or click + to add "{newTag.trim()}"
-                          </div>
-                        ) : (
-                          <div className="py-2 text-sm text-muted-foreground">
-                            Press Enter or click + to create "{newTag.trim()}"
-                          </div>
-                        )}
-                      </CommandEmpty>
-                      {filteredTags.length > 0 && (
-                        <CommandGroup heading="Existing Tags">
-                          {filteredTags.slice(0, 10).map((tag) => (
-                            <CommandItem
-                              key={tag}
-                              value={tag}
-                              onSelect={() => handleTagSelect(tag)}
-                              className="cursor-pointer"
-                            >
-                              <Check
-                                className={cn(
-                                  "mr-2 h-4 w-4",
-                                  tags.some(t => t.toLowerCase() === tag.toLowerCase()) ? "opacity-100" : "opacity-0"
-                                )}
-                              />
-                              {tag}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
+                  <Plus className="w-4 h-4" />
+                </Button>
+              </div>
+              <PopoverContent 
+                className="w-[300px] p-0 border-[3px] border-foreground max-h-[300px] overflow-y-auto"
+                align="start"
+                side="bottom"
+                sideOffset={4}
+                onOpenAutoFocus={(e) => e.preventDefault()}
+                onInteractOutside={(e) => {
+                  // Don't close if clicking on the input
+                  if (tagInputRef.current?.contains(e.target as Node)) {
+                    e.preventDefault();
+                  }
+                }}
+              >
+                <div className="p-1">
+                  {filteredTags.length === 0 ? (
+                    <div className="py-2 px-2 text-sm text-muted-foreground">
+                      {exactMatch ? (
+                        <>Press Enter or click + to add "{newTag.trim()}"</>
+                      ) : (
+                        <>Press Enter or click + to create "{newTag.trim()}"</>
                       )}
-                      {!exactMatch && newTag.trim() && (
-                        <CommandGroup heading="Create New Tag">
-                          <CommandItem
-                            value={newTag.trim()}
-                            onSelect={() => addTag()}
-                            className="cursor-pointer font-semibold"
-                          >
-                            <Plus className="mr-2 h-4 w-4" />
-                            Create "{newTag.trim()}"
-                          </CommandItem>
-                        </CommandGroup>
-                      )}
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              )}
+                    </div>
+                  ) : null}
+                  {filteredTags.length > 0 && (
+                    <div>
+                      <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                        Existing Tags
+                      </div>
+                      {filteredTags.slice(0, 10).map((tag) => (
+                        <div
+                          key={tag}
+                          onClick={() => handleTagSelect(tag)}
+                          className={cn(
+                            "relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground",
+                            tags.some(t => t.toLowerCase() === tag.toLowerCase()) && "bg-accent"
+                          )}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              tags.some(t => t.toLowerCase() === tag.toLowerCase()) ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          {tag}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {!exactMatch && newTag.trim() && (
+                    <div>
+                      <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                        Create New Tag
+                      </div>
+                      <div
+                        onClick={() => addTag()}
+                        className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm font-semibold outline-none hover:bg-accent hover:text-accent-foreground"
+                      >
+                        <Plus className="mr-2 h-4 w-4" />
+                        Create "{newTag.trim()}"
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </PopoverContent>
             </Popover>
           </div>
 
