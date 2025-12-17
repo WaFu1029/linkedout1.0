@@ -1,12 +1,15 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { X, Plus, Loader2 } from "lucide-react";
+import { X, Plus, Loader2, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { cn } from "@/lib/utils";
 
 interface CreatePostDialogProps {
   open: boolean;
@@ -19,13 +22,87 @@ export function CreatePostDialog({ open, onOpenChange, userId }: CreatePostDialo
   const [content, setContent] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState("");
+  const [tagPopoverOpen, setTagPopoverOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const queryClient = useQueryClient();
 
-  const addTag = () => {
-    if (newTag.trim() && !tags.includes(newTag.trim())) {
-      setTags([...tags, newTag.trim()]);
+  // Fetch all unique tags from existing posts
+  const { data: existingTags = [] } = useQuery({
+    queryKey: ["all-tags"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("posts")
+        .select("tags");
+      
+      if (error) {
+        console.error("Error fetching tags:", error);
+        return [];
+      }
+
+      const tagSet = new Set<string>();
+      data?.forEach((post) => {
+        if (post.tags && Array.isArray(post.tags)) {
+          post.tags.forEach((tag: string) => {
+            if (tag && tag.trim()) {
+              tagSet.add(tag.trim().toLowerCase());
+            }
+          });
+        }
+      });
+
+      return Array.from(tagSet).sort();
+    },
+    enabled: open, // Only fetch when dialog is open
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+  });
+
+  // Filter tags based on input
+  const filteredTags = useMemo(() => {
+    if (!newTag.trim()) {
+      return existingTags;
+    }
+    const searchTerm = newTag.trim().toLowerCase();
+    const selectedTagLowercases = tags.map(t => t.toLowerCase());
+    return existingTags.filter((tag) => 
+      tag.toLowerCase().includes(searchTerm) && !selectedTagLowercases.includes(tag.toLowerCase())
+    );
+  }, [newTag, existingTags, tags]);
+
+  // Check if current input matches an existing tag exactly
+  const exactMatch = useMemo(() => {
+    const trimmed = newTag.trim().toLowerCase();
+    return existingTags.some(tag => tag.toLowerCase() === trimmed);
+  }, [newTag, existingTags]);
+
+  const addTag = (tagToAdd?: string) => {
+    const tag = (tagToAdd || newTag.trim()).toLowerCase();
+    if (tag && !tags.some(t => t.toLowerCase() === tag)) {
+      setTags([...tags, tag]);
       setNewTag("");
+      setTagPopoverOpen(false);
+    }
+  };
+
+  const handleTagInputChange = (value: string) => {
+    setNewTag(value);
+    setTagPopoverOpen(value.length > 0);
+  };
+
+  const handleTagSelect = (tag: string) => {
+    addTag(tag);
+  };
+
+  const handleTagInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (newTag.trim()) {
+        addTag();
+      } else if (filteredTags.length > 0) {
+        // Select first suggestion
+        handleTagSelect(filteredTags[0]);
+      }
+    } else if (e.key === "Escape") {
+      setTagPopoverOpen(false);
     }
   };
 
@@ -67,6 +144,7 @@ export function CreatePostDialog({ open, onOpenChange, userId }: CreatePostDialo
       setContent("");
       setTags([]);
       setNewTag("");
+      setTagPopoverOpen(false);
       onOpenChange(false);
     } catch (error) {
       console.error("Error:", error);
@@ -138,24 +216,83 @@ export function CreatePostDialog({ open, onOpenChange, userId }: CreatePostDialo
                 </span>
               ))}
             </div>
-            <div className="flex gap-2 max-w-xs">
-              <Input
-                value={newTag}
-                onChange={(e) => setNewTag(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addTag())}
-                placeholder="Add tag..."
-                className="shadow-none"
-                disabled={isSubmitting}
-              />
-              <Button
-                onClick={addTag}
-                className="border-[3px] border-foreground shadow-none"
-                type="button"
-                disabled={isSubmitting}
-              >
-                <Plus className="w-4 h-4" />
-              </Button>
-            </div>
+            <Popover open={tagPopoverOpen} onOpenChange={setTagPopoverOpen}>
+              <PopoverTrigger asChild>
+                <div className="flex gap-2 max-w-xs">
+                  <Input
+                    value={newTag}
+                    onChange={(e) => handleTagInputChange(e.target.value)}
+                    onKeyDown={handleTagInputKeyDown}
+                    onFocus={() => newTag.trim() && setTagPopoverOpen(true)}
+                    placeholder="Search or add tag..."
+                    className="shadow-none"
+                    disabled={isSubmitting}
+                  />
+                  <Button
+                    onClick={() => addTag()}
+                    className="border-[3px] border-foreground shadow-none"
+                    type="button"
+                    disabled={isSubmitting || !newTag.trim()}
+                  >
+                    <Plus className="w-4 h-4" />
+                  </Button>
+                </div>
+              </PopoverTrigger>
+              {newTag.trim() && (
+                <PopoverContent 
+                  className="w-[var(--radix-popover-trigger-width)] p-0 border-[3px] border-foreground"
+                  align="start"
+                >
+                  <Command>
+                    <CommandList>
+                      <CommandEmpty>
+                        {exactMatch ? (
+                          <div className="py-2 text-sm text-muted-foreground">
+                            Press Enter or click + to add "{newTag.trim()}"
+                          </div>
+                        ) : (
+                          <div className="py-2 text-sm text-muted-foreground">
+                            Press Enter or click + to create "{newTag.trim()}"
+                          </div>
+                        )}
+                      </CommandEmpty>
+                      {filteredTags.length > 0 && (
+                        <CommandGroup heading="Existing Tags">
+                          {filteredTags.slice(0, 10).map((tag) => (
+                            <CommandItem
+                              key={tag}
+                              value={tag}
+                              onSelect={() => handleTagSelect(tag)}
+                              className="cursor-pointer"
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  tags.some(t => t.toLowerCase() === tag.toLowerCase()) ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              {tag}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      )}
+                      {!exactMatch && newTag.trim() && (
+                        <CommandGroup heading="Create New Tag">
+                          <CommandItem
+                            value={newTag.trim()}
+                            onSelect={() => addTag()}
+                            className="cursor-pointer font-semibold"
+                          >
+                            <Plus className="mr-2 h-4 w-4" />
+                            Create "{newTag.trim()}"
+                          </CommandItem>
+                        </CommandGroup>
+                      )}
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              )}
+            </Popover>
           </div>
 
           {/* Actions */}
@@ -167,6 +304,7 @@ export function CreatePostDialog({ open, onOpenChange, userId }: CreatePostDialo
                 setContent("");
                 setTags([]);
                 setNewTag("");
+                setTagPopoverOpen(false);
                 onOpenChange(false);
               }}
               className="border-[3px] border-foreground"

@@ -83,13 +83,19 @@ const Feed = () => {
   const [previousIndex, setPreviousIndex] = useState<number | null>(null);
   const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null);
   const [showQuote, setShowQuote] = useState(false);
+  const [quoteFadingOut, setQuoteFadingOut] = useState(false);
   const [currentQuote, setCurrentQuote] = useState(motivationalQuotes[0]);
   const [pendingIndex, setPendingIndex] = useState<number | null>(null);
+  const [slideInDirection, setSlideInDirection] = useState<'left' | 'right' | null>(null);
+  const [isSliding, setIsSliding] = useState(false);
   const [showProfileDrawer, setShowProfileDrawer] = useState(false);
   const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
   const [touchEnd, setTouchEnd] = useState<{ x: number; y: number } | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  
+  // Animation duration in ms (slower for smoother effect)
+  const slideDuration = 700;
 
   // Fetch posts from Supabase
   const { data: allPosts = [], isLoading: postsLoading } = useQuery({
@@ -182,7 +188,8 @@ const Feed = () => {
   const previousPostProfile = previousPost ? profiles.find((p) => p.id === previousPost?.author_id || p.email === previousPost?.author_email) : null;
 
   const goNext = () => {
-    if (currentIndex < visiblePosts.length - 1 && !slideDirection && !showQuote) {
+    if (currentIndex < visiblePosts.length - 1 && !isSliding && !showQuote) {
+      setIsSliding(true);
       setShowProfileDrawer(false);
       setPreviousIndex(currentIndex);
       setSlideDirection('left');
@@ -193,7 +200,8 @@ const Feed = () => {
   };
 
   const goPrev = () => {
-    if (currentIndex > 0 && !slideDirection && !showQuote) {
+    if (currentIndex > 0 && !isSliding && !showQuote) {
+      setIsSliding(true);
       setShowProfileDrawer(false);
       setPreviousIndex(currentIndex);
       setSlideDirection('right');
@@ -203,29 +211,45 @@ const Feed = () => {
     }
   };
 
-  // Handle the transition sequence: slide out -> show quote -> slide in new card
+  // Handle the transition sequence: slide out -> show quote -> fade out quote -> slide in new card
   useEffect(() => {
-    if (slideDirection && pendingIndex !== null) {
-      // First, wait for slide-out animation to complete
+    if (slideDirection && pendingIndex !== null && isSliding) {
+      // Phase 1: Wait for slide-out animation to complete
       const slideOutTimer = setTimeout(() => {
-        // Hide the old card and show the quote
+        // Clear slide-out state and show quote
+        const direction = slideDirection; // Save for slide-in
         setPreviousIndex(null);
         setSlideDirection(null);
         setShowQuote(true);
+        setQuoteFadingOut(false);
         
-        // After showing quote for 2 seconds, bring in the new card
-        const quoteTimer = setTimeout(() => {
-          setShowQuote(false);
-          setCurrentIndex(pendingIndex);
-          setPendingIndex(null);
-        }, 2000);
+        // Phase 2: Show quote for 1.5 seconds, then start fade out
+        const quoteFadeTimer = setTimeout(() => {
+          setQuoteFadingOut(true);
+          
+          // Phase 3: Wait for fade-out animation (500ms), then slide in new card
+          const quoteHideTimer = setTimeout(() => {
+            setCurrentIndex(pendingIndex);
+            setShowQuote(false);
+            setQuoteFadingOut(false);
+            setSlideInDirection(direction);
+            setPendingIndex(null);
+            
+            // Phase 4: After slide-in completes, reset all state
+            const slideInTimer = setTimeout(() => {
+              setSlideInDirection(null);
+              setIsSliding(false);
+            }, slideDuration);
+            
+          }, 500);
+          
+        }, 3000);
         
-        return () => clearTimeout(quoteTimer);
-      }, 500);
+      }, slideDuration);
       
       return () => clearTimeout(slideOutTimer);
     }
-  }, [slideDirection, pendingIndex]);
+  }, [slideDirection, pendingIndex, isSliding]);
 
   // Touch handlers for mobile swipe
   const minSwipeDistance = 50;
@@ -268,12 +292,12 @@ const Feed = () => {
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "ArrowRight" && !slideDirection && !showQuote) goNext();
-      if (e.key === "ArrowLeft" && !slideDirection && !showQuote) goPrev();
+      if (e.key === "ArrowRight" && !isSliding && !showQuote) goNext();
+      if (e.key === "ArrowLeft" && !isSliding && !showQuote) goPrev();
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [currentIndex, visiblePosts.length, slideDirection, showQuote]);
+  }, [currentIndex, visiblePosts.length, isSliding, showQuote]);
 
   if (postsLoading) {
     return (
@@ -312,25 +336,6 @@ const Feed = () => {
     );
   }
 
-  // Helper function to get transform style for cards
-  const getCardTransform = (isOutgoing: boolean) => {
-    if (!slideDirection) return 'translateX(0)';
-    
-    if (isOutgoing) {
-      // Outgoing card slides out
-      return slideDirection === 'left' ? 'translateX(-100%)' : 'translateX(100%)';
-    } else {
-      // Incoming card slides in from opposite direction
-      return 'translateX(0)';
-    }
-  };
-
-  const getInitialTransform = () => {
-    if (!slideDirection) return 'translateX(0)';
-    // Incoming card starts off-screen
-    return slideDirection === 'left' ? 'translateX(100%)' : 'translateX(-100%)';
-  };
-
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -341,7 +346,7 @@ const Feed = () => {
         <div className="flex items-center pr-4">
           <button
             onClick={goPrev}
-            disabled={currentIndex === 0 || !!slideDirection || showQuote}
+            disabled={currentIndex === 0 || isSliding || showQuote}
             className="p-3 bg-background border-[3px] border-foreground shadow-brutal hover:shadow-brutal-hover hover:translate-x-[2px] hover:translate-y-[2px] transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:translate-x-0 disabled:hover:translate-y-0 disabled:hover:shadow-brutal"
           >
             <ChevronLeft className="w-6 h-6" />
@@ -368,7 +373,7 @@ const Feed = () => {
           <div className="flex-1 relative overflow-hidden">
             {/* Motivational Quote Overlay */}
             {showQuote && (
-              <div className="absolute inset-0 flex items-center justify-center z-10 animate-in fade-in duration-300">
+              <div className={`absolute inset-0 flex items-center justify-center z-10 transition-opacity duration-500 ${quoteFadingOut ? 'opacity-0' : 'opacity-100 animate-in fade-in duration-300'}`}>
                 <div className="max-w-2xl text-center px-8">
                   <div className="bg-primary/10 border-[3px] border-foreground shadow-brutal p-8 md:p-12">
                     <Sparkles className="w-8 h-8 mx-auto mb-4 text-primary" />
@@ -384,10 +389,21 @@ const Feed = () => {
             )}
 
             {/* Outgoing card (previous post sliding out) */}
-            {previousIndex !== null && previousPost && (
+            {previousIndex !== null && previousPost && slideDirection && (
               <div
-                className="absolute inset-0 flex gap-6 transition-transform duration-500 ease-out"
-                style={{ transform: getCardTransform(true) }}
+                className="absolute inset-0 flex gap-6"
+                ref={(el) => {
+                  if (el && slideDirection) {
+                    // Start at center
+                    el.style.transition = 'none';
+                    el.style.transform = 'translateX(0)';
+                    // Force reflow
+                    el.offsetHeight;
+                    // Animate to off-screen with slower duration
+                    el.style.transition = `transform ${slideDuration}ms ease-out`;
+                    el.style.transform = slideDirection === 'left' ? 'translateX(-100%)' : 'translateX(100%)';
+                  }
+                }}
               >
                 {/* Post Section - 65% */}
                 <div className="w-[65%] flex flex-col">
@@ -409,21 +425,21 @@ const Feed = () => {
             )}
 
             {/* Incoming card (current post sliding in) */}
-            {!showQuote && (
+            {!showQuote && !slideDirection && (
               <div
-                className={`h-full flex gap-6 transition-transform duration-500 ease-out ${!slideDirection && !previousIndex ? 'animate-in fade-in slide-in-from-bottom-4 duration-500' : ''}`}
+                className={`h-full flex gap-6`}
                 style={{ 
-                  transform: slideDirection ? 'translateX(0)' : 'translateX(0)',
+                  transform: 'translateX(0)',
                 }}
                 ref={(el) => {
-                  if (el && slideDirection && previousIndex !== null) {
+                  if (el && slideInDirection) {
                     // Set initial off-screen position immediately
                     el.style.transition = 'none';
-                    el.style.transform = getInitialTransform();
+                    el.style.transform = slideInDirection === 'left' ? 'translateX(100%)' : 'translateX(-100%)';
                     // Force reflow
                     el.offsetHeight;
-                    // Enable transition and animate to center
-                    el.style.transition = 'transform 500ms ease-out';
+                    // Enable transition and animate to center with slower duration
+                    el.style.transition = `transform ${slideDuration}ms ease-out`;
                     el.style.transform = 'translateX(0)';
                   }
                 }}
@@ -455,7 +471,7 @@ const Feed = () => {
         <div className="flex items-center pl-4">
           <button
             onClick={goNext}
-            disabled={currentIndex === visiblePosts.length - 1 || !!slideDirection || showQuote}
+            disabled={currentIndex === visiblePosts.length - 1 || isSliding || showQuote}
             className="p-3 bg-background border-[3px] border-foreground shadow-brutal hover:shadow-brutal-hover hover:translate-x-[2px] hover:translate-y-[2px] transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:translate-x-0 disabled:hover:translate-y-0 disabled:hover:shadow-brutal"
           >
             <ChevronRight className="w-6 h-6" />
@@ -489,7 +505,7 @@ const Feed = () => {
         <div className="h-full pt-20 pb-16 px-4 overflow-hidden relative">
           {/* Motivational Quote Overlay - Mobile */}
           {showQuote && (
-            <div className="absolute inset-0 flex items-center justify-center z-10 animate-in fade-in duration-300 px-4">
+            <div className={`absolute inset-0 flex items-center justify-center z-10 transition-opacity duration-500 px-4 ${quoteFadingOut ? 'opacity-0' : 'opacity-100 animate-in fade-in duration-300'}`}>
               <div className="w-full max-w-md text-center">
                 <div className="bg-primary/10 border-[3px] border-foreground shadow-brutal p-6">
                   <Sparkles className="w-6 h-6 mx-auto mb-3 text-primary" />
@@ -505,10 +521,18 @@ const Feed = () => {
           )}
 
           {/* Outgoing card (previous post sliding out) - Mobile */}
-          {previousIndex !== null && previousPost && (
+          {previousIndex !== null && previousPost && slideDirection && (
             <div
-              className="absolute inset-0 pt-20 pb-16 px-4 transition-transform duration-500 ease-out"
-              style={{ transform: getCardTransform(true) }}
+              className="absolute inset-0 pt-20 pb-16 px-4"
+              ref={(el) => {
+                if (el && slideDirection) {
+                  el.style.transition = 'none';
+                  el.style.transform = 'translateX(0)';
+                  el.offsetHeight;
+                  el.style.transition = `transform ${slideDuration}ms ease-out`;
+                  el.style.transform = slideDirection === 'left' ? 'translateX(-100%)' : 'translateX(100%)';
+                }
+              }}
             >
               <SwipePostCard 
                 post={previousPost} 
@@ -520,15 +544,15 @@ const Feed = () => {
           )}
 
           {/* Incoming card (current post sliding in) - Mobile */}
-          {!showQuote && (
+          {!showQuote && !slideDirection && (
             <div
-              className={`h-full transition-transform duration-500 ease-out ${!slideDirection && !previousIndex ? 'animate-in fade-in slide-in-from-bottom-4 duration-500' : ''}`}
+              className={`h-full`}
               ref={(el) => {
-                if (el && slideDirection && previousIndex !== null) {
+                if (el && slideInDirection) {
                   el.style.transition = 'none';
-                  el.style.transform = getInitialTransform();
+                  el.style.transform = slideInDirection === 'left' ? 'translateX(100%)' : 'translateX(-100%)';
                   el.offsetHeight;
-                  el.style.transition = 'transform 500ms ease-out';
+                  el.style.transition = `transform ${slideDuration}ms ease-out`;
                   el.style.transform = 'translateX(0)';
                 }
               }}

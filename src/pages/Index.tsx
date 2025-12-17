@@ -627,7 +627,7 @@ const Index = () => {
         style={{
           left: '0',
           bottom: '0',
-          width: '80%',
+          width: '95%',
           height: '18px',
           transform: lineChartVisible ? 'rotate(-38deg)' : 'rotate(-38deg) scaleX(0)',
           transformOrigin: '0 100%',

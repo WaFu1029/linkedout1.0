@@ -69,7 +69,7 @@ const Wall = () => {
             {/* Stats */}
             <div className="inline-block bg-foreground text-background px-6 py-4 border-[3px] border-foreground mb-8">
               <p className="text-3xl font-bold font-mono">{isLoading ? "..." : allPosts.length}</p>
-              <p className="text-sm uppercase tracking-wide">Failures archived forever</p>
+              <p className="text-sm uppercase tracking-wide">Failures.</p>
             </div>
           </div>
 
