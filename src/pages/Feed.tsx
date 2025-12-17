@@ -291,7 +291,7 @@ const Feed = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-20">
+    <div className="min-h-screen bg-background">
       <Navbar />
 
       {/* Desktop Layout */}
@@ -426,7 +426,10 @@ const Feed = () => {
         />
       </div>
 
-      <div className="bg-background pb-8">
+      {/* Spacer to extend background below fixed-height content */}
+      <div className="hidden md:block bg-background h-32"></div>
+
+      <div className="bg-background border-0">
         <Footer />
       </div>
 

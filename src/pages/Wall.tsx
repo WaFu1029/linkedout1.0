@@ -142,7 +142,12 @@ const Wall = () => {
         </div>
       </main>
 
-      <Footer />
+      {/* Spacer to extend background below content */}
+      <div className="bg-background h-32"></div>
+
+      <div className="bg-background border-0">
+        <Footer />
+      </div>
     </div>
   );
 };
