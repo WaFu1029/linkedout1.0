@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -22,9 +22,11 @@ export function CreatePostDialog({ open, onOpenChange, userId }: CreatePostDialo
   const [tags, setTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState("");
   const [tagPopoverOpen, setTagPopoverOpen] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const queryClient = useQueryClient();
   const tagInputRef = useRef<HTMLInputElement>(null);
+  const highlightedItemRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   // Fetch all unique tags from existing posts
   const { data: existingTags = [] } = useQuery({
@@ -86,23 +88,90 @@ export function CreatePostDialog({ open, onOpenChange, userId }: CreatePostDialo
   const handleTagInputChange = (value: string) => {
     setNewTag(value);
     setTagPopoverOpen(value.length > 0);
+    setHighlightedIndex(-1); // Reset highlight when typing
+    // Clear refs when input changes
+    highlightedItemRefs.current = [];
   };
+
+  // Calculate total number of selectable items
+  const totalItems = useMemo(() => {
+    let count = filteredTags.length;
+    if (!exactMatch && newTag.trim()) {
+      count += 1; // Add "Create New Tag" option
+    }
+    return count;
+  }, [filteredTags.length, exactMatch, newTag]);
+
+  // Reset highlighted index when popover closes
+  useEffect(() => {
+    if (!tagPopoverOpen) {
+      setHighlightedIndex(-1);
+      highlightedItemRefs.current = [];
+    }
+  }, [tagPopoverOpen]);
 
   const handleTagSelect = (tag: string) => {
     addTag(tag);
   };
 
   const handleTagInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
+    if (e.key === "ArrowDown") {
       e.preventDefault();
-      if (newTag.trim()) {
+      if (tagPopoverOpen && totalItems > 0) {
+        setHighlightedIndex((prev) => {
+          const next = prev < totalItems - 1 ? prev + 1 : 0;
+          // Scroll into view
+          setTimeout(() => {
+            highlightedItemRefs.current[next]?.scrollIntoView({
+              block: "nearest",
+              behavior: "smooth",
+            });
+          }, 0);
+          return next;
+        });
+      }
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (tagPopoverOpen && totalItems > 0) {
+        setHighlightedIndex((prev) => {
+          const next = prev <= 0 ? totalItems - 1 : prev - 1;
+          // Scroll into view
+          setTimeout(() => {
+            highlightedItemRefs.current[next]?.scrollIntoView({
+              block: "nearest",
+              behavior: "smooth",
+            });
+          }, 0);
+          return next;
+        });
+      }
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (highlightedIndex >= 0 && highlightedIndex < filteredTags.length) {
+        // Select highlighted existing tag
+        handleTagSelect(filteredTags[highlightedIndex]);
+        setHighlightedIndex(-1);
+      } else if (highlightedIndex === filteredTags.length && !exactMatch && newTag.trim()) {
+        // Select "Create New Tag" option
         addTag();
+        setHighlightedIndex(-1);
+      } else if (newTag.trim()) {
+        // Fallback: add current input as tag
+        addTag();
+        setHighlightedIndex(-1);
       } else if (filteredTags.length > 0) {
-        // Select first suggestion
+        // Select first suggestion if nothing highlighted
         handleTagSelect(filteredTags[0]);
+        setHighlightedIndex(-1);
       }
     } else if (e.key === "Escape") {
       setTagPopoverOpen(false);
+      setHighlightedIndex(-1);
+    } else {
+      // Reset highlight when typing other keys
+      if (highlightedIndex >= 0) {
+        setHighlightedIndex(-1);
+      }
     }
   };
 
@@ -145,6 +214,7 @@ export function CreatePostDialog({ open, onOpenChange, userId }: CreatePostDialo
       setTags([]);
       setNewTag("");
       setTagPopoverOpen(false);
+      setHighlightedIndex(-1);
       onOpenChange(false);
     } catch (error) {
       console.error("Error:", error);
@@ -267,6 +337,10 @@ export function CreatePostDialog({ open, onOpenChange, userId }: CreatePostDialo
                     e.preventDefault();
                   }
                 }}
+                onCloseAutoFocus={(e) => {
+                  e.preventDefault();
+                  tagInputRef.current?.focus();
+                }}
               >
                 <div className="p-1">
                   {filteredTags.length === 0 ? (
@@ -283,24 +357,36 @@ export function CreatePostDialog({ open, onOpenChange, userId }: CreatePostDialo
                       <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
                         Existing Tags
                       </div>
-                      {filteredTags.slice(0, 10).map((tag) => (
-                        <div
-                          key={tag}
-                          onClick={() => handleTagSelect(tag)}
-                          className={cn(
-                            "relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground",
-                            tags.some(t => t.toLowerCase() === tag.toLowerCase()) && "bg-accent"
-                          )}
-                        >
-                          <Check
+                      {filteredTags.slice(0, 10).map((tag, index) => {
+                        const isHighlighted = highlightedIndex === index;
+                        const isSelected = tags.some(t => t.toLowerCase() === tag.toLowerCase());
+                        return (
+                          <div
+                            key={tag}
+                            ref={(el) => {
+                              highlightedItemRefs.current[index] = el;
+                            }}
+                            onClick={() => {
+                              handleTagSelect(tag);
+                              setHighlightedIndex(-1);
+                            }}
+                            onMouseEnter={() => setHighlightedIndex(index)}
                             className={cn(
-                              "mr-2 h-4 w-4",
-                              tags.some(t => t.toLowerCase() === tag.toLowerCase()) ? "opacity-100" : "opacity-0"
+                              "relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground",
+                              isHighlighted && "bg-accent text-accent-foreground",
+                              isSelected && "bg-accent"
                             )}
-                          />
-                          {tag}
-                        </div>
-                      ))}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                isSelected ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            {tag}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                   {!exactMatch && newTag.trim() && (
@@ -309,8 +395,18 @@ export function CreatePostDialog({ open, onOpenChange, userId }: CreatePostDialo
                         Create New Tag
                       </div>
                       <div
-                        onClick={() => addTag()}
-                        className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm font-semibold outline-none hover:bg-accent hover:text-accent-foreground"
+                        ref={(el) => {
+                          highlightedItemRefs.current[filteredTags.length] = el;
+                        }}
+                        onClick={() => {
+                          addTag();
+                          setHighlightedIndex(-1);
+                        }}
+                        onMouseEnter={() => setHighlightedIndex(filteredTags.length)}
+                        className={cn(
+                          "relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm font-semibold outline-none hover:bg-accent hover:text-accent-foreground",
+                          highlightedIndex === filteredTags.length && "bg-accent text-accent-foreground"
+                        )}
                       >
                         <Plus className="mr-2 h-4 w-4" />
                         Create "{newTag.trim()}"
@@ -332,6 +428,7 @@ export function CreatePostDialog({ open, onOpenChange, userId }: CreatePostDialo
                 setTags([]);
                 setNewTag("");
                 setTagPopoverOpen(false);
+                setHighlightedIndex(-1);
                 onOpenChange(false);
               }}
               className="border-[3px] border-foreground"
