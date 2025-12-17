@@ -336,3 +336,25 @@
     opacity: 0;
   }
 }
+
+/* Momentum scrolling for Index page only */
+.index-page-scroll {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
+
+/* Enable momentum scrolling on the body when Index page is active */
+body:has(.index-page-scroll) {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
+
+/* For browsers that support scroll-momentum */
+@supports (-webkit-overflow-scrolling: touch) {
+  .index-page-scroll,
+  body:has(.index-page-scroll) {
+    -webkit-overflow-scrolling: touch;
+  }
+}

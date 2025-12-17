@@ -13,6 +13,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
+import Lenis from "lenis";
 
 const TypingText = ({ text, speed = 100, onComplete, showPreExplosion, highlightWords = [] }: { text: string; speed?: number; onComplete?: () => void; showPreExplosion?: boolean; highlightWords?: string[] }) => {
   const { theme } = useTheme();
@@ -349,6 +350,31 @@ const Index = () => {
   const lineChartRef = useRef<HTMLDivElement>(null);
   const statRef = useRef<HTMLDivElement>(null);
 
+  // Initialize Lenis for momentum scrolling (Index page only)
+  useEffect(() => {
+    const lenis = new Lenis({
+      duration: 1.2,
+      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+      orientation: 'vertical',
+      gestureOrientation: 'vertical',
+      smoothWheel: true,
+      wheelMultiplier: 1,
+      touchMultiplier: 2,
+      infinite: false,
+    });
+
+    function raf(time: number) {
+      lenis.raf(time);
+      requestAnimationFrame(raf);
+    }
+
+    requestAnimationFrame(raf);
+
+    return () => {
+      lenis.destroy();
+    };
+  }, []);
+
   useEffect(() => {
     const barObserver = new IntersectionObserver(
       (entries) => {
@@ -425,7 +451,7 @@ const Index = () => {
   }, [statVisible]);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background index-page-scroll">
       <Navbar />
 
       {/* Hero Section */}
