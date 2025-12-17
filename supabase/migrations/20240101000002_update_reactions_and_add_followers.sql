@@ -44,3 +44,4 @@ CREATE INDEX IF NOT EXISTS idx_followers_follower_id ON public.followers(followe
 CREATE INDEX IF NOT EXISTS idx_followers_following_id ON public.followers(following_id);
 
 
+

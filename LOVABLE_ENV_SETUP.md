@@ -65,3 +65,4 @@ If you can't find environment variables in Lovable:
 
 
 
+

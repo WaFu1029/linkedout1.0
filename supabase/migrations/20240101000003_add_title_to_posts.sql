@@ -6,3 +6,4 @@ ALTER TABLE public.posts ADD COLUMN IF NOT EXISTS title TEXT;
 -- The title will be optional, and content will serve as the body text
 
 
+
