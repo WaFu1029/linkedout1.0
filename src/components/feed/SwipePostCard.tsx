@@ -1,411 +1,516 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { Navbar } from "@/components/Navbar";
+import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
-import { MessageCircle, ChevronDown, ChevronUp, ThumbsUp, ThumbsDown, Trash2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { useQueryClient } from "@tanstack/react-query";
+import { SwipePostCard } from "@/components/feed/SwipePostCard";
+import { ProfileSidebar } from "@/components/feed/ProfileSidebar";
+import { MobileProfileDrawer } from "@/components/feed/MobileProfileDrawer";
+import { CreatePostDialog } from "@/components/feed/CreatePostDialog";
 import { useAuth } from "@/contexts/AuthContext";
-import { useTheme } from "next-themes";
-import { toast } from "sonner";
-import { useNavigate } from "react-router-dom";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { ChevronLeft, ChevronRight, ChevronUp, Plus, Loader2, Sparkles } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { subWeeks, formatDistanceToNow } from "date-fns";
 
-interface Reaction {
-  like?: number;
-  dislike?: number;
-}
+// Mock data structure - will be replaced with Supabase queries
+const mockPosts = [
+  {
+    id: "1",
+    author: "Jamie Chen",
+    industry: "Software Engineering",
+    title: "4th FAANG Rejection",
+    content: "Got rejected from my dream job at a FAANG company for the 4th time. They said I 'lacked leadership experience.' I've been leading a team of 8 for 2 years. Sometimes the answer is just no, and that's okay.",
+    tags: ["rejection", "job search", "tech industry"],
+    timestamp: "2h ago",
+    reactions: { like: 245, dislike: 12 },
+    author_email: "jamie@example.com",
+  },
+  {
+    id: "2",
+    author: "Marcus Williams",
+    industry: "Freelance Design",
+    title: null,
+    content: "Lost a client because I was 'too honest' about timeline estimates. Apparently they wanted me to lie?",
+    tags: ["freelancing", "client work"],
+    timestamp: "5h ago",
+    reactions: { like: 435, dislike: 8 },
+    author_email: "marcus@example.com",
+  },
+  {
+    id: "3",
+    author: "Priya Sharma",
+    industry: "Marketing",
+    title: "The 'Make It Pop' Campaign",
+    content: "Pitched a campaign I spent 3 weeks on. Client chose the competitor's idea which was literally just 'make it pop.' I need a drink.",
+    tags: ["creative block", "client work", "rejection"],
+    timestamp: "8h ago",
+    reactions: { like: 668, dislike: 15 },
+    author_email: "priya@example.com",
+  },
+  {
+    id: "4",
+    author: "Alex Rivera",
+    industry: "Startup Founder",
+    title: "3 Years, $2M, No Product-Market Fit",
+    content: "My startup failed after 3 years. We raised $2M, hired 15 people, and ultimately couldn't find product-market fit. I learned more from this failure than any success. Now I'm figuring out what's next.",
+    tags: ["startup failure", "entrepreneurship", "lessons learned"],
+    timestamp: "1d ago",
+    reactions: { like: 1202, dislike: 23 },
+    author_email: "alex@example.com",
+  },
+];
 
-interface Post {
-  id: string;
-  author: string;
-  industry: string;
-  title?: string | null;
-  content: string;
-  tags?: string[];
-  timestamp: string;
-  reactions?: Reaction;
-  author_id?: string;
-}
-
-interface SwipePostCardProps {
-  post: Post;
-  currentUserEmail?: string | null;
-  comments?: Array<{ id: string; text: string; author?: string }>;
-  isMobile?: boolean;
-}
-
-export function SwipePostCard({ post, currentUserEmail, comments = [], isMobile = false }: SwipePostCardProps) {
-  const [showComments, setShowComments] = useState(false);
-  const [newComment, setNewComment] = useState("");
-  const [isReacting, setIsReacting] = useState(false);
-  const [userReaction, setUserReaction] = useState<string | null>(null);
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const queryClient = useQueryClient();
+const Feed = () => {
   const { user } = useAuth();
-  const { theme } = useTheme();
-  const isDark = theme === 'dark';
-  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [previousIndex, setPreviousIndex] = useState<number | null>(null);
+  const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null);
+  const [showProfileDrawer, setShowProfileDrawer] = useState(false);
+  const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
+  const [touchEnd, setTouchEnd] = useState<{ x: number; y: number } | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  const isOwnPost = user?.id === post.author_id;
-
-  const reactions = post.reactions || { like: 0, dislike: 0 };
-  const postComments = comments.filter((c) => c.id === post.id);
-  const firstName = post.author?.split(" ")[0] || post.author;
-
-  // Fetch user's reaction for this post
-  useEffect(() => {
-    const fetchUserReaction = async () => {
-      if (!user || !post.id) return;
-      
-      const { data } = await supabase
-        .from("reactions")
-        .select("reaction_type")
-        .eq("post_id", post.id)
-        .eq("user_id", user.id)
-        .single();
-
-      if (data) {
-        setUserReaction(data.reaction_type);
-      } else {
-        setUserReaction(null);
-      }
-    };
-
-    fetchUserReaction();
-  }, [user, post.id]);
-
-  const handleReaction = async (reactionType: 'like' | 'dislike') => {
-    if (!user) {
-      toast.error("Create an account to interact with other users", {
-        action: {
-          label: "Sign Up",
-          onClick: () => navigate("/auth?mode=signup"),
-        },
-      });
-      return;
-    }
-    
-    if (!post.id || isReacting) return;
-
-    setIsReacting(true);
-    try {
-      // Check if user already has a reaction
-      const { data: existingReaction } = await supabase
-        .from("reactions")
-        .select("id, reaction_type")
-        .eq("post_id", post.id)
-        .eq("user_id", user.id)
-        .single();
-
-      if (existingReaction) {
-        if (existingReaction.reaction_type === reactionType) {
-          // Remove reaction if clicking the same one
-          const { error } = await supabase
-            .from("reactions")
-            .delete()
-            .eq("post_id", post.id)
-            .eq("user_id", user.id);
-
-          if (error) throw error;
-          setUserReaction(null);
-        } else {
-          // Replace reaction if clicking different one
-          const { error } = await supabase
-            .from("reactions")
-            .update({ reaction_type: reactionType })
-            .eq("post_id", post.id)
-            .eq("user_id", user.id);
-
-          if (error) throw error;
-          setUserReaction(reactionType);
-        }
-      } else {
-        // Add new reaction
-        const { error } = await supabase
-          .from("reactions")
-          .insert({
-            post_id: post.id,
-            user_id: user.id,
-            reaction_type: reactionType,
-          });
-
-        if (error) throw error;
-        setUserReaction(reactionType);
-      }
-
-      // Invalidate queries to refresh reactions
-      queryClient.invalidateQueries({ queryKey: ["posts"] });
-      queryClient.invalidateQueries({ queryKey: ["profile-posts"] });
-    } catch (error) {
-      console.error("Error handling reaction:", error);
-    } finally {
-      setIsReacting(false);
-    }
-  };
-
-  const handleComment = () => {
-    if (!user) {
-      toast.error("Create an account to interact with other users", {
-        action: {
-          label: "Sign Up",
-          onClick: () => navigate("/auth?mode=signup"),
-        },
-      });
-      return;
-    }
-    
-    if (newComment.trim() && newComment.split(/\s+/).length <= 3) {
-      // TODO: Implement comment logic with Supabase
-      console.log("Comment:", newComment);
-      setNewComment("");
-    }
-  };
-
-  const wordCount = newComment.trim().split(/\s+/).filter(Boolean).length;
-
-  const handleDelete = async () => {
-    if (!user || !post.id || !isOwnPost) return;
-
-    setIsDeleting(true);
-    try {
-      const { error } = await supabase
+  // Fetch posts from Supabase
+  const { data: allPosts = [], isLoading: postsLoading } = useQuery({
+    queryKey: ["posts"],
+    queryFn: async () => {
+      const { data: postsData, error: postsError } = await supabase
         .from("posts")
-        .delete()
-        .eq("id", post.id)
-        .eq("author_id", user.id);
+        .select("*")
+        .order("created_at", { ascending: false });
 
-      if (error) throw error;
+      if (postsError) {
+        console.error("Error fetching posts:", postsError);
+        // Fallback to mock data if table doesn't exist yet
+        if (postsError.code === "PGRST205" || postsError.message?.includes("Could not find the table")) {
+          return mockPosts;
+        }
+        return [];
+      }
 
-      toast.success("Post deleted");
-      queryClient.invalidateQueries({ queryKey: ["posts"] });
-      queryClient.invalidateQueries({ queryKey: ["profile-posts"] });
-      queryClient.invalidateQueries({ queryKey: ["wall-posts"] });
-      setShowDeleteDialog(false);
-    } catch (error) {
-      console.error("Error deleting post:", error);
-      toast.error("Failed to delete post");
-    } finally {
-      setIsDeleting(false);
+      if (!postsData || postsData.length === 0) {
+        return mockPosts; // Fallback to mock data if no posts exist
+      }
+
+      // Fetch reactions for all posts
+      const postIds = postsData.map((p) => p.id);
+      const { data: reactionsData } = await supabase
+        .from("reactions")
+        .select("*")
+        .in("post_id", postIds);
+
+      // Group reactions by post
+      const reactionsByPost: Record<string, { like: number; dislike: number }> = {};
+      reactionsData?.forEach((reaction) => {
+        if (!reactionsByPost[reaction.post_id]) {
+          reactionsByPost[reaction.post_id] = { like: 0, dislike: 0 };
+        }
+        if (reaction.reaction_type === 'like') {
+          reactionsByPost[reaction.post_id].like += 1;
+        } else if (reaction.reaction_type === 'dislike') {
+          reactionsByPost[reaction.post_id].dislike += 1;
+        }
+      });
+
+      // Fetch profiles to get author info
+      const { data: profilesData } = await supabase.from("profiles").select("*");
+      const profiles = profilesData || [];
+
+      // Transform posts to match expected format
+      return postsData.map((post) => {
+        const authorProfile = profiles.find((p) => p.id === post.author_id);
+        return {
+          id: post.id,
+          author: authorProfile?.full_name || authorProfile?.email?.split("@")[0] || "Anonymous",
+          industry: authorProfile?.industry || "Human Being",
+          title: post.title || null,
+          content: post.content,
+          tags: post.tags || [],
+          timestamp: formatDistanceToNow(new Date(post.created_at), { addSuffix: true }),
+          reactions: reactionsByPost[post.id] || { like: 0, dislike: 0 },
+          author_email: authorProfile?.email || post.author_id,
+          author_id: post.author_id,
+        };
+      });
+    },
+    enabled: true,
+  });
+
+  // Fetch profiles for each post author (for profile sidebar)
+  const { data: profiles = [] } = useQuery({
+    queryKey: ["profiles"],
+    queryFn: async () => {
+      const { data } = await supabase.from("profiles").select("*");
+      return data || [];
+    },
+  });
+
+  const twoWeeksAgo = subWeeks(new Date(), 2);
+
+  // Filter posts based on visibility rules
+  const visiblePosts = allPosts.filter((post: any) => {
+    // For now, show all posts. In the future, filter by date and following
+    return true;
+  });
+
+  const currentPost = visiblePosts[currentIndex];
+  const currentPostProfile = profiles.find((p) => p.id === currentPost?.author_id || p.email === currentPost?.author_email);
+  
+  // Get previous post data for animation
+  const previousPost = previousIndex !== null ? visiblePosts[previousIndex] : null;
+  const previousPostProfile = previousPost ? profiles.find((p) => p.id === previousPost?.author_id || p.email === previousPost?.author_email) : null;
+
+  const goNext = () => {
+    if (currentIndex < visiblePosts.length - 1 && !slideDirection) {
+      setShowProfileDrawer(false);
+      setPreviousIndex(currentIndex);
+      setSlideDirection('left');
+      setCurrentIndex((prev) => prev + 1);
     }
+  };
+
+  const goPrev = () => {
+    if (currentIndex > 0 && !slideDirection) {
+      setShowProfileDrawer(false);
+      setPreviousIndex(currentIndex);
+      setSlideDirection('right');
+      setCurrentIndex((prev) => prev - 1);
+    }
+  };
+
+  // Clear animation state after transition completes
+  useEffect(() => {
+    if (slideDirection) {
+      const timer = setTimeout(() => {
+        setPreviousIndex(null);
+        setSlideDirection(null);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [slideDirection, currentIndex]);
+
+  // Touch handlers for mobile swipe
+  const minSwipeDistance = 50;
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart({
+      x: e.targetTouches[0].clientX,
+      y: e.targetTouches[0].clientY,
+    });
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd({
+      x: e.targetTouches[0].clientX,
+      y: e.targetTouches[0].clientY,
+    });
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+
+    const distanceX = touchStart.x - touchEnd.x;
+    const distanceY = touchStart.y - touchEnd.y;
+    const isHorizontalSwipe = Math.abs(distanceX) > Math.abs(distanceY);
+
+    if (isHorizontalSwipe) {
+      if (distanceX > minSwipeDistance) goNext();
+      if (distanceX < -minSwipeDistance) goPrev();
+    } else {
+      if (distanceY > minSwipeDistance && !showProfileDrawer) {
+        setShowProfileDrawer(true);
+      }
+      if (distanceY < -minSwipeDistance && showProfileDrawer) {
+        setShowProfileDrawer(false);
+      }
+    }
+  };
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "ArrowRight" && !slideDirection) goNext();
+      if (e.key === "ArrowLeft" && !slideDirection) goPrev();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [currentIndex, visiblePosts.length, slideDirection]);
+
+  if (postsLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <main className="pt-24 pb-16 flex items-center justify-center min-h-[60vh]">
+          <div className="text-center">
+            <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto mb-4" />
+            <p className="text-muted-foreground font-semibold">Loading failures...</p>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (visiblePosts.length === 0) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <main className="pt-24 pb-16 flex items-center justify-center min-h-[60vh]">
+          <div className="text-center max-w-md">
+            <Sparkles className="w-16 h-16 mx-auto text-primary mb-4" />
+            <p className="font-bold text-2xl mb-2">No failures yet!</p>
+            <p className="text-lg text-muted-foreground mb-6">Be the first to share yours.</p>
+            {user && (
+              <Button size="lg" className="border-[3px] border-foreground shadow-brutal" onClick={() => setShowCreate(true)}>
+                <Plus className="mr-2" />
+                Share Failure
+              </Button>
+            )}
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  // Helper function to get transform style for cards
+  const getCardTransform = (isOutgoing: boolean) => {
+    if (!slideDirection) return 'translateX(0)';
+    
+    if (isOutgoing) {
+      // Outgoing card slides out
+      return slideDirection === 'left' ? 'translateX(-100%)' : 'translateX(100%)';
+    } else {
+      // Incoming card slides in from opposite direction
+      return 'translateX(0)';
+    }
+  };
+
+  const getInitialTransform = () => {
+    if (!slideDirection) return 'translateX(0)';
+    // Incoming card starts off-screen
+    return slideDirection === 'left' ? 'translateX(100%)' : 'translateX(-100%)';
   };
 
   return (
-    <Card className={`p-6 flex flex-col ${isMobile ? "h-full overflow-y-auto" : "h-full"} relative`}>
-      {/* Author - only on mobile since desktop has sidebar */}
-      {isMobile && (
-        <div className="mb-4 flex items-start justify-between">
-          <div>
-            <p className="font-bold text-xl">{firstName}</p>
-            <p className="text-sm font-semibold text-primary font-mono">{post.industry}</p>
-          </div>
-          {isOwnPost && (
-            <button
-              onClick={() => setShowDeleteDialog(true)}
-              className="p-2 hover:bg-secondary border-[3px] border-foreground transition-colors"
-              aria-label="Delete post"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-          )}
-        </div>
-      )}
+    <div className="min-h-screen bg-background">
+      <Navbar />
 
-      {/* Delete button for desktop */}
-      {!isMobile && isOwnPost && (
-        <div className="absolute top-4 right-4">
+      {/* Desktop Layout */}
+      <div className="hidden md:flex h-[calc(100vh-64px)] px-4 pt-24">
+        {/* Left Arrow */}
+        <div className="flex items-center pr-4">
           <button
-            onClick={() => setShowDeleteDialog(true)}
-            className="p-2 hover:bg-secondary border-[3px] border-foreground transition-colors"
-            aria-label="Delete post"
+            onClick={goPrev}
+            disabled={currentIndex === 0 || !!slideDirection}
+            className="p-3 bg-background border-[3px] border-foreground shadow-brutal hover:shadow-brutal-hover hover:translate-x-[2px] hover:translate-y-[2px] transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:translate-x-0 disabled:hover:translate-y-0 disabled:hover:shadow-brutal"
           >
-            <Trash2 className="w-4 h-4" />
+            <ChevronLeft className="w-6 h-6" />
           </button>
         </div>
-      )}
 
-      {/* Title */}
-      {post.title && (
-        <h2 className="font-bold text-3xl mb-3">{post.title}</h2>
-      )}
+        {/* Main Content Area */}
+        <div className="flex-1 flex flex-col py-6">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-4 px-0">
+            <h1 className="font-bold text-3xl tracking-tight">Your Feed</h1>
+            {user && (
+              <Button
+                onClick={() => setShowCreate(true)}
+                className="border-[3px] border-foreground shadow-brutal"
+              >
+                <Plus className="mr-2" />
+                Share
+              </Button>
+            )}
+          </div>
 
-      {/* Content */}
-      <p className="font-medium text-2xl leading-relaxed mb-5 flex-grow">{post.content}</p>
+          {/* Post and Profile Cards with transition */}
+          <div className="flex-1 relative overflow-hidden">
+            {/* Outgoing card (previous post sliding out) */}
+            {previousIndex !== null && previousPost && (
+              <div
+                className="absolute inset-0 flex gap-6 transition-transform duration-500 ease-out"
+                style={{ transform: getCardTransform(true) }}
+              >
+                {/* Post Section - 65% */}
+                <div className="w-[65%] flex flex-col">
+                  <SwipePostCard 
+                    post={previousPost} 
+                    currentUserEmail={user?.email} 
+                    comments={[]} 
+                  />
+                </div>
 
-      {/* Tags */}
-      {post.tags && post.tags.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-4">
-          {post.tags.map((tag, i) => (
-            <span
-              key={i}
-              className="bg-primary text-primary-foreground px-3 py-1.5 text-xs font-bold border-[3px] border-foreground shadow-brutal"
+                {/* Profile Section - 35% */}
+                <div className="w-[35%] flex flex-col">
+                  <ProfileSidebar 
+                    profile={previousPostProfile || null} 
+                    post={previousPost || null} 
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Incoming card (current post sliding in) */}
+            <div
+              className={`h-full flex gap-6 transition-transform duration-500 ease-out`}
+              style={{ 
+                transform: slideDirection ? 'translateX(0)' : 'translateX(0)',
+                // Use CSS custom property for initial position
+              }}
+              ref={(el) => {
+                if (el && slideDirection && previousIndex !== null) {
+                  // Set initial off-screen position immediately
+                  el.style.transition = 'none';
+                  el.style.transform = getInitialTransform();
+                  // Force reflow
+                  el.offsetHeight;
+                  // Enable transition and animate to center
+                  el.style.transition = 'transform 500ms ease-out';
+                  el.style.transform = 'translateX(0)';
+                }
+              }}
             >
-              {tag}
-            </span>
-          ))}
+              {/* Post Section - 65% */}
+              <div className="w-[65%] flex flex-col">
+                {currentPost && (
+                  <SwipePostCard 
+                    post={currentPost} 
+                    currentUserEmail={user?.email} 
+                    comments={[]} 
+                  />
+                )}
+              </div>
+
+              {/* Profile Section - 35% */}
+              <div className="w-[35%] flex flex-col">
+                <ProfileSidebar 
+                  profile={currentPostProfile || null} 
+                  post={currentPost || null} 
+                />
+              </div>
+            </div>
+          </div>
         </div>
-      )}
 
-      {/* Timestamp */}
-      <p className="text-xs font-semibold text-muted-foreground mb-4 font-mono">
-        {post.timestamp || "Just now"}
-      </p>
-
-      {/* Reactions */}
-      <div className="flex flex-wrap gap-2 mb-4">
-        <button
-          onClick={() => handleReaction('like')}
-          disabled={isReacting}
-          className={`px-3 py-2 border-[3px] border-foreground font-semibold text-sm shadow-brutal transition-all flex items-center gap-2 ${
-            !user 
-              ? "opacity-50 cursor-not-allowed" 
-              : "hover:shadow-brutal-hover hover:translate-x-[2px] hover:translate-y-[2px]"
-          } ${
-            userReaction === 'like'
-              ? isDark 
-                ? "bg-[#a78bfa] text-white hover:bg-[#8b5cf6]" 
-                : "bg-[#f97316] text-white hover:bg-[#ea580c]"
-              : "bg-background hover:bg-secondary"
-          }`}
-        >
-          <ThumbsUp className="w-4 h-4" />
-          <span>Like</span>
-          {reactions.like > 0 && <span>· {reactions.like}</span>}
-        </button>
-        <button
-          onClick={() => handleReaction('dislike')}
-          disabled={isReacting}
-          className={`px-3 py-2 border-[3px] border-foreground font-semibold text-sm shadow-brutal transition-all flex items-center gap-2 ${
-            !user 
-              ? "opacity-50 cursor-not-allowed" 
-              : "hover:shadow-brutal-hover hover:translate-x-[2px] hover:translate-y-[2px]"
-          } ${
-            userReaction === 'dislike'
-              ? isDark 
-                ? "bg-[#a78bfa] text-white hover:bg-[#8b5cf6]" 
-                : "bg-[#f97316] text-white hover:bg-[#ea580c]"
-              : "bg-background hover:bg-secondary"
-          }`}
-        >
-          <ThumbsDown className="w-4 h-4" />
-          <span>Dislike</span>
-          {reactions.dislike > 0 && <span>· {reactions.dislike}</span>}
-        </button>
+        {/* Right Arrow */}
+        <div className="flex items-center pl-4">
+          <button
+            onClick={goNext}
+            disabled={currentIndex === visiblePosts.length - 1 || !!slideDirection}
+            className="p-3 bg-background border-[3px] border-foreground shadow-brutal hover:shadow-brutal-hover hover:translate-x-[2px] hover:translate-y-[2px] transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:translate-x-0 disabled:hover:translate-y-0 disabled:hover:shadow-brutal"
+          >
+            <ChevronRight className="w-6 h-6" />
+          </button>
+        </div>
       </div>
 
-      {/* Comments */}
-      <button
-        onClick={() => setShowComments(!showComments)}
-        className="flex items-center gap-2 text-sm font-bold text-muted-foreground hover:text-primary transition-colors"
+      {/* Mobile Layout */}
+      <div
+        ref={containerRef}
+        className="md:hidden h-[calc(100vh-64px)] relative overflow-hidden pt-16"
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
       >
-        <MessageCircle className="w-4 h-4" />
-        {postComments.length} Comments
-        {showComments ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-      </button>
-
-      {showComments && (
-        <div className="mt-4 pt-4 border-t-[3px] border-dashed border-foreground">
-          {postComments.length > 0 ? (
-            postComments.map((comment, i) => (
-              <div key={i} className="mb-2 bg-secondary p-3 border-[3px] border-foreground">
-                {comment.author && (
-                  <p className="font-bold text-xs text-primary mb-1">{comment.author}</p>
-                )}
-                <p className="text-sm font-medium">{comment.text}</p>
-              </div>
-            ))
-          ) : (
-            <p className="text-sm text-muted-foreground italic">No comments yet</p>
-          )}
-
-          <div className="flex gap-2 mt-3">
-            <Input
-              value={user ? newComment : ""}
-              onChange={(e) => {
-                if (!user) {
-                  toast.error("Create an account to interact with other users", {
-                    action: {
-                      label: "Sign Up",
-                      onClick: () => navigate("/auth?mode=signup"),
-                    },
-                  });
-                  return;
-                }
-                setNewComment(e.target.value);
-              }}
-              placeholder="3 words max..."
-              onKeyDown={(e) => {
-                if (!user) {
-                  e.preventDefault();
-                  toast.error("Create an account to interact with other users", {
-                    action: {
-                      label: "Sign Up",
-                      onClick: () => navigate("/auth?mode=signup"),
-                    },
-                  });
-                  return;
-                }
-                if (e.key === "Enter") handleComment();
-              }}
-              onClick={() => {
-                if (!user) {
-                  toast.error("Create an account to interact with other users", {
-                    action: {
-                      label: "Sign Up",
-                      onClick: () => navigate("/auth?mode=signup"),
-                    },
-                  });
-                }
-              }}
-              className={`border-[3px] border-foreground ${!user ? "opacity-50 cursor-not-allowed" : ""}`}
-              disabled={!user}
-            />
+        {/* Header */}
+        <div className="absolute top-0 left-0 right-0 z-10 p-4 flex items-center justify-between bg-gradient-to-b from-background via-background/95 to-transparent pt-16">
+          <h1 className="font-bold text-xl tracking-tight">Your Feed</h1>
+          {user && (
             <Button
-              onClick={handleComment}
-              disabled={!user || wordCount === 0 || wordCount > 3}
-              className={`border-[3px] border-foreground shadow-brutal ${!user ? "opacity-50 cursor-not-allowed" : ""}`}
+              onClick={() => setShowCreate(true)}
+              size="sm"
+              className="border-[3px] border-foreground shadow-brutal"
             >
-              Post
+              <Plus className="w-4 h-4" />
             </Button>
-          </div>
-          {wordCount > 3 && (
-            <p className="text-destructive text-xs font-bold mt-2">Max 3 words!</p>
           )}
         </div>
-      )}
 
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent className="border-[3px] border-foreground shadow-brutal bg-background">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-xl font-bold">Delete Post?</AlertDialogTitle>
-            <AlertDialogDescription className="text-base">
-              Are you sure you want to delete this post? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="gap-2">
-            <AlertDialogCancel className="border-[3px] border-foreground shadow-brutal">Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              disabled={isDeleting}
-              className="bg-destructive text-destructive-foreground border-[3px] border-foreground shadow-brutal"
+        {/* Post Cards with Animation */}
+        <div className="h-full pt-20 pb-16 px-4 overflow-hidden relative">
+          {/* Outgoing card (previous post sliding out) - Mobile */}
+          {previousIndex !== null && previousPost && (
+            <div
+              className="absolute inset-0 pt-20 pb-16 px-4 transition-transform duration-500 ease-out"
+              style={{ transform: getCardTransform(true) }}
             >
-              {isDeleting ? "Deleting..." : "Delete"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </Card>
-  );
-}
+              <SwipePostCard 
+                post={previousPost} 
+                currentUserEmail={user?.email} 
+                comments={[]} 
+                isMobile 
+              />
+            </div>
+          )}
 
+          {/* Incoming card (current post sliding in) - Mobile */}
+          <div
+            className="h-full transition-transform duration-500 ease-out"
+            ref={(el) => {
+              if (el && slideDirection && previousIndex !== null) {
+                el.style.transition = 'none';
+                el.style.transform = getInitialTransform();
+                el.offsetHeight;
+                el.style.transition = 'transform 500ms ease-out';
+                el.style.transform = 'translateX(0)';
+              }
+            }}
+          >
+            {currentPost && (
+              <SwipePostCard 
+                post={currentPost} 
+                currentUserEmail={user?.email} 
+                comments={[]} 
+                isMobile 
+              />
+            )}
+          </div>
+        </div>
+
+        {/* Swipe up hint */}
+        {!showProfileDrawer && (
+          <div className="absolute bottom-4 left-0 right-0 flex justify-center z-20">
+            <button
+              onClick={() => setShowProfileDrawer(true)}
+              className="flex flex-col items-center text-muted-foreground hover:text-foreground transition-colors animate-bounce"
+            >
+              <ChevronUp className="w-5 h-5" />
+              <span className="text-xs font-semibold">View Profile</span>
+            </button>
+          </div>
+        )}
+
+        {/* Mobile Profile Drawer */}
+        <MobileProfileDrawer
+          isOpen={showProfileDrawer}
+          onClose={() => setShowProfileDrawer(false)}
+          profile={currentPostProfile || null}
+          post={currentPost || null}
+        />
+      </div>
+
+      {/* Spacer to extend background below fixed-height content */}
+      <div className="hidden md:block bg-background h-32"></div>
+
+      <div className="bg-background border-0">
+        <Footer />
+      </div>
+
+      {/* Create Post Dialog */}
+      {user && (
+        <CreatePostDialog
+          open={showCreate}
+          onOpenChange={setShowCreate}
+          userId={user.id}
+        />
+      )}
+    </div>
+  );
+};
+
+export default Feed;
