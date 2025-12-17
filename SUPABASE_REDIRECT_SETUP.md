@@ -49,3 +49,4 @@ Now users can sign in immediately without confirming their email.
 3. It should redirect to your app (not localhost)
 4. Then you can sign in!
 
+

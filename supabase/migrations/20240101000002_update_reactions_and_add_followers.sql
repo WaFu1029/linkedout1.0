@@ -42,3 +42,4 @@ CREATE POLICY "Users can unfollow others" ON public.followers
 -- Create indexes for followers table
 CREATE INDEX IF NOT EXISTS idx_followers_follower_id ON public.followers(follower_id);
 CREATE INDEX IF NOT EXISTS idx_followers_following_id ON public.followers(following_id);
+

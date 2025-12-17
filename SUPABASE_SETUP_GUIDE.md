@@ -115,3 +115,4 @@ CREATE TRIGGER set_updated_at
 - **"Invalid API key"**: Double-check you're using the `anon` `public` key, not `service_role`
 - **Environment variables not working**: In Lovable, make sure you've saved them and restarted/previewed your app
 
+

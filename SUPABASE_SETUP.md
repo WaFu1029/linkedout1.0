@@ -38,3 +38,4 @@ After running the migration, users will be able to:
 3. View and edit their profiles
 4. See the Profile link in the navbar when logged in
 
+

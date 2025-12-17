@@ -462,7 +462,7 @@ const Index = () => {
           <div className="max-w-3xl text-left pl-4 md:pl-8 mb-8">
             <h2 className="text-3xl md:text-4xl font-bold text-background">
               Why? <br /> <br />
-              Because social media causes social anxiety.
+              Because comparison on social media causes social anxiety.
             </h2>
           </div>
             <div className="pl-4 md:pl-8 pr-4 md:pr-8">
