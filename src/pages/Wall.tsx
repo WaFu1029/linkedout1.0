@@ -63,7 +63,7 @@ const Wall = () => {
           <div className="max-w-3xl mx-auto text-center mb-8">
             <h1 className="text-4xl md:text-5xl font-bold mb-4">The Wall</h1>
             <p className="text-xl text-muted-foreground mb-6">
-              An anonymous, permanent archive of all failures ever shared.
+              Our very own permanent and anonymous archive of all failures ever shared.
             </p>
             
             {/* Stats */}
