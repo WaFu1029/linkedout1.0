@@ -60,10 +60,10 @@ const mockPosts = [
   },
 ];
 
-// Motivational quotes to show between swipes
 const motivationalQuotes = [
+  // Original quotes
   { text: "Failure is simply the opportunity to begin again, this time more intelligently.", author: "Henry Ford" },
-  { text: "Success is not final, failure is not fatal: it is the courage to continue that counts.", author: "Winston Churchill" },
+  // Churchill quote removed (disputed attribution)
   { text: "I have not failed. I've just found 10,000 ways that won't work.", author: "Thomas Edison" },
   { text: "The only real mistake is the one from which we learn nothing.", author: "Henry Ford" },
   { text: "Failures are finger posts on the road to achievement.", author: "C.S. Lewis" },
@@ -74,7 +74,37 @@ const motivationalQuotes = [
   { text: "The master has failed more times than the beginner has even tried.", author: "Stephen McCranie" },
   { text: "Fall seven times, stand up eight.", author: "Japanese Proverb" },
   { text: "What would you attempt to do if you knew you could not fail?", author: "Robert Schuller" },
+  
+  // New quotes
+  { text: "Ever tried. Ever failed. No matter. Try again. Fail again. Fail better.", author: "Samuel Beckett" },
+  { text: "There is no innovation and creativity without failure. Period.", author: "Brené Brown" },
+  { text: "Failure is not the opposite of success; it's part of success.", author: "Arianna Huffington" },
+  { text: "I can accept failure, everyone fails at something. But I can't accept not trying.", author: "Michael Jordan" },
+  { text: "It is impossible to live without failing at something, unless you live so cautiously that you might as well not have lived at all.", author: "J.K. Rowling" },
+  { text: "The greatest glory in living lies not in never falling, but in rising every time we fall.", author: "Nelson Mandela" },
+  { text: "Failure should be our teacher, not our undertaker.", author: "Denis Waitley" },
+  { text: "You build on failure. You use it as a stepping stone.", author: "Johnny Cash" },
+  { text: "Do not be embarrassed by your failures, learn from them and start again.", author: "Richard Branson" },
+  { text: "Our greatest weakness lies in giving up. The most certain way to succeed is always to try just one more time.", author: "Thomas Edison" },
+  { text: "Rock bottom became the solid foundation on which I rebuilt my life.", author: "J.K. Rowling" },
+  { text: "When we give ourselves permission to fail, we, at the same time, give ourselves permission to excel.", author: "Eloise Ristad" },
+  // Einstein quotes removed or could be kept only as "Attributed to Albert Einstein"
+  { text: "Mistakes are the portals of discovery.", author: "James Joyce" },
+  { text: "Winners are not afraid of losing. But losers are. Failure is part of the process of success.", author: "Robert Kiyosaki" },
+  { text: "You may encounter many defeats, but you must not be defeated.", author: "Maya Angelou" },
+  { text: "If you're not prepared to be wrong, you'll never come up with anything original.", author: "Ken Robinson" },
+  { text: "Pain is temporary. Quitting lasts forever.", author: "Lance Armstrong" },
+  { text: "It's not how far you fall, but how high you bounce that counts.", author: "Zig Ziglar" },
+  { text: "Don't worry about failures, worry about the chances you miss when you don't even try.", author: "Jack Canfield" },
+  // Churchill quote removed (disputed attribution)
+  { text: "The phoenix must burn to emerge.", author: "Janet Fitch" },
+  { text: "Failure is the tuition you pay for success.", author: "Walter Brunell" },
+  { text: "Your best teacher is your last mistake.", author: "Ralph Nader" },
+  { text: "No human ever became interesting by not failing.", author: "Carrie Fisher" },
+  { text: "We are all failures — at least the best of us are.", author: "J.M. Barrie" },
+  { text: "Defeat is not the worst of failures. Not to have tried is the true failure.", author: "George Edward Woodberry" },
 ];
+
 
 const Feed = () => {
   const { user } = useAuth();

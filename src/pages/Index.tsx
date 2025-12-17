@@ -14,7 +14,7 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart";
 
-const TypingText = ({ text, speed = 100, onComplete, showPreExplosion }: { text: string; speed?: number; onComplete?: () => void; showPreExplosion?: boolean }) => {
+const TypingText = ({ text, speed = 100, onComplete, showPreExplosion, highlightWords = [] }: { text: string; speed?: number; onComplete?: () => void; showPreExplosion?: boolean; highlightWords?: string[] }) => {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
   const [displayedText, setDisplayedText] = useState("");
@@ -77,6 +77,34 @@ const TypingText = ({ text, speed = 100, onComplete, showPreExplosion }: { text:
   const allChars = displayedText.replace(/\n/g, '').split('');
   const centerIndex = Math.floor(allChars.length / 2);
 
+  // Build a set of highlighted character positions based on the full target text (not displayedText)
+  // This allows highlighting to work as characters are typed out
+  const highlightedPositions = useMemo(() => {
+    const positions = new Set<number>();
+    const fullTextWithoutNewlines = text.replace(/\n/g, '');
+    
+    for (const word of highlightWords) {
+      let searchIndex = 0;
+      while (true) {
+        const wordStart = fullTextWithoutNewlines.indexOf(word, searchIndex);
+        if (wordStart === -1) break;
+        
+        for (let i = wordStart; i < wordStart + word.length; i++) {
+          positions.add(i);
+        }
+        searchIndex = wordStart + 1;
+      }
+    }
+    return positions;
+  }, [text, highlightWords]);
+
+  // Helper function to check if a character is part of a highlighted word
+  const isInHighlightedWord = (lineIndex: number, charIndex: number, lines: string[]) => {
+    const charsBeforeThisLine = lines.slice(0, lineIndex).join('\n').replace(/\n/g, '').length;
+    const globalIndex = charsBeforeThisLine + charIndex;
+    return highlightedPositions.has(globalIndex);
+  };
+
   return (
     <span className={isPreExploding ? "pre-explosion-text" : ""}>
       {lines.map((line, lineIndex) => {
@@ -89,18 +117,22 @@ const TypingText = ({ text, speed = 100, onComplete, showPreExplosion }: { text:
               const distanceFromCenter = Math.abs(globalIndex - centerIndex);
               const direction = globalIndex < centerIndex ? -1 : 1;
               const offset = distanceFromCenter * 3;
+              const isHighlighted = isInHighlightedWord(lineIndex, charIndex, lines);
               
               return (
                 <span
                   key={`${lineIndex}-${charIndex}`}
                   className={isPreExploding ? "inline-block" : "inline"}
-                  style={isPreExploding ? {
-                    animation: isDark ? `pre-explode-char-dark 0.75s ease-out forwards` : `pre-explode-char 0.75s ease-out forwards`,
-                    animationDelay: `${(distanceFromCenter / allChars.length) * 0.2}s`,
-                    transformOrigin: 'center',
-                    '--offset': `${offset}px`,
-                    '--direction': direction,
-                  } as React.CSSProperties & { '--offset': string; '--direction': number } : {}}
+                  style={{
+                    ...(isPreExploding ? {
+                      animation: isDark ? `pre-explode-char-dark 0.75s ease-out forwards` : `pre-explode-char 0.75s ease-out forwards`,
+                      animationDelay: `${(distanceFromCenter / allChars.length) * 0.2}s`,
+                      transformOrigin: 'center',
+                      '--offset': `${offset}px`,
+                      '--direction': direction,
+                    } as React.CSSProperties & { '--offset': string; '--direction': number } : {}),
+                    ...(isHighlighted ? { color: '#a855f7' } : {})
+                  }}
                 >
                   {char === ' ' ? '\u00A0' : char}
                 </span>
@@ -408,7 +440,8 @@ const Index = () => {
     <TypingText 
       key="new-text"
       text={"Here's something that\nabsolutely flopped ..."} 
-      speed={50} 
+      speed={50}
+      highlightWords={["flopped"]}
     />
   </span>
 ) : hasTypedFirstText ? (
@@ -678,7 +711,7 @@ const Index = () => {
                 <h3 className="text-2xl font-bold">Step 1: Share Your Failures</h3>
               </div>
               <p className="text-muted-foreground text-lg">
-                Post about rejections, mistakes, and moments of vulnerability. Tag them, react with empathy, and let go of the pressure to perform perfection.
+              If you got laid off, failed a class, or just miss your ex, post about it. That is, if you're comfortable. We don't judge.
               </p>
             </Card>
 
@@ -717,7 +750,7 @@ const Index = () => {
                 <h3 className="text-2xl font-bold">Step 4: Get Immortalized in The Wall</h3>
               </div>
               <p className="text-muted-foreground text-lg">
-                <strong>The Wall</strong> is an anonymous, permanent archive of all failures ever posted. We keep it here just so we can look back. 
+                <strong>The Wall</strong> is an anonymous, permanent archive of all failures ever posted. We keep it here so we can look back and see just how imperfect we <em>all</em> are.
               </p>
             </Card>
           </div>
