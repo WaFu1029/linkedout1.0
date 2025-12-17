@@ -132,7 +132,7 @@ const TypingText = ({ text, speed = 100, onComplete, showPreExplosion, highlight
                       '--offset': `${offset}px`,
                       '--direction': direction,
                     } as React.CSSProperties & { '--offset': string; '--direction': number } : {}),
-                    ...(isHighlighted ? { color: '#a855f7' } : {})
+                    ...(isHighlighted ? { color: isDark ? '#a855f7' : '#f97316' } : {})
                   }}
                 >
                   {char === ' ' ? '\u00A0' : char}
