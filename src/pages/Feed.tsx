@@ -291,7 +291,7 @@ const Feed = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-20">
       <Navbar />
 
       {/* Desktop Layout */}
@@ -426,7 +426,9 @@ const Feed = () => {
         />
       </div>
 
-      <Footer />
+      <div className="bg-background pb-8">
+        <Footer />
+      </div>
 
       {/* Create Post Dialog */}
       {user && (
