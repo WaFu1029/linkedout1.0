@@ -64,3 +64,4 @@ If you can't find environment variables in Lovable:
    - **anon public** key (for VITE_SUPABASE_PUBLISHABLE_KEY) - it's the one that starts with `eyJ`
 
 
+

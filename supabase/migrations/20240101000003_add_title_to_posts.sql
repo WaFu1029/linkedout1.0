@@ -5,3 +5,4 @@ ALTER TABLE public.posts ADD COLUMN IF NOT EXISTS title TEXT;
 -- Actually, let's keep content as is for backward compatibility
 -- The title will be optional, and content will serve as the body text
 
+

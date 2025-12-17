@@ -39,3 +39,4 @@ After running the migration, users will be able to:
 4. See the Profile link in the navbar when logged in
 
 
+

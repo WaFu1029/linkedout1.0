@@ -116,3 +116,4 @@ CREATE TRIGGER set_updated_at
 - **Environment variables not working**: In Lovable, make sure you've saved them and restarted/previewed your app
 
 
+
