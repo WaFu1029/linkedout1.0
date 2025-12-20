@@ -2539,11 +2539,11 @@ const Profile = () => {
       ))}
     </CarouselContent>
     {userPosts.length > 1 && (
-      <div className="flex justify-center gap-4 mt-4">
-        <CarouselPrevious className="static translate-y-0 border-[3px] border-foreground" />
-        <CarouselNext className="static translate-y-0 border-[3px] border-foreground" />
-      </div>
-    )}
+  <>
+    <CarouselPrevious className="left-0 top-1/2 -translate-y-1/2 h-16 w-10 rounded-none border-[3px] border-foreground hover:bg-background" />
+    <CarouselNext className="right-0 top-1/2 -translate-y-1/2 h-16 w-10 rounded-none border-[3px] border-foreground hover:bg-background" />
+  </>
+)}
   </Carousel>
 </div>
               )}

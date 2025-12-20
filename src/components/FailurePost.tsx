@@ -189,8 +189,8 @@ export function FailurePost({
 
   return (
     <Card
-      className={`${sizeClasses[size]} p-5 flex flex-col hover:shadow-brutal-hover hover:translate-x-[2px] hover:translate-y-[2px] cursor-pointer relative`}
-    >
+  className={`${sizeClasses[size]} p-5 flex flex-col relative`}
+>
       {/* Delete button */}
       {isOwnPost && (
         <button
