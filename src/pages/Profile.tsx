@@ -2444,13 +2444,21 @@ const Profile = () => {
     }}
     className="w-full"
   >
-    <CarouselContent className="-ml-2 md:-ml-4">
-      {userPosts.map((post) => (
-        <CarouselItem key={post.id} className="pl-2 md:pl-4 basis-full">
-          {/* ... FailurePost component ... */}
-        </CarouselItem>
-      ))}
-    </CarouselContent>
+    <CarouselItem key={post.id} className="pl-2 md:pl-4 basis-full">
+  <FailurePost
+    id={post.id}
+    author={post.author}
+    industry={post.industry}
+    title={post.title}
+    content={post.content}
+    tags={post.tags}
+    timestamp={post.timestamp}
+    reactions={post.reactions}
+    comments={post.comments}
+    size="md"
+    author_id={post.author_id}
+  />
+</CarouselItem>
     {userPosts.length > 1 && (
       <div className="flex justify-center gap-4 mt-4">
         <CarouselPrevious className="static translate-y-0 border-[3px] border-foreground" />
