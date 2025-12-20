@@ -2643,11 +2643,11 @@ const Profile = () => {
               </div>
               
               <Card 
-                className="border-[3px] border-foreground shadow-brutal p-4 aspect-[2/1] relative" 
+                className="border-[3px] border-foreground shadow-brutal p-4 relative" 
                 style={{ backgroundColor: '#46250A' }}
               >
                 {gardenLoading ? (
-                  <div className="w-full h-full flex items-center justify-center">
+                  <div className="w-full flex items-center justify-center min-h-[400px]">
                     <div className="text-center">
                       <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-2" />
                       <p className="text-muted-foreground text-sm">Loading garden...</p>
@@ -2655,10 +2655,10 @@ const Profile = () => {
                   </div>
                 ) : (
                   <div 
-                    className="w-full h-full grid gap-1"
+                    className="w-full grid gap-1"
                     style={{ 
-                      gridTemplateColumns: 'repeat(8, 1fr)',
-                      gridTemplateRows: 'repeat(6, 1fr)'
+                      gridTemplateColumns: 'repeat(8, minmax(0, 1fr))',
+                      gridAutoRows: '1fr'
                     }}
                   >
                     {gardenGrid.map((row, rowIndex) =>
@@ -2682,7 +2682,7 @@ const Profile = () => {
                                 <button
                                   onClick={() => handleCellClick(rowIndex, colIndex)}
                                   className={`
-                                    w-full h-full flex items-center justify-center border-2 transition-all relative
+                                    w-full aspect-square flex items-center justify-center border-2 transition-all relative
                                     ${isGifted
                                       ? 'bg-amber-700 border-amber-500 shadow-[0_0_8px_rgba(251,191,36,0.6)]' 
                                       : 'bg-amber-700 border-amber-600'
@@ -2718,7 +2718,7 @@ const Profile = () => {
                             onClick={() => handleCellClick(rowIndex, colIndex)}
                             disabled={!canPlant && !selectedInventoryItem}
                             className={`
-                              w-full h-full flex items-center justify-center border-2 transition-all relative
+                              w-full aspect-square flex items-center justify-center border-2 transition-all relative
                               ${cellEmoji 
                                 ? isGifted
                                   ? 'bg-amber-700 border-amber-500 shadow-[0_0_8px_rgba(251,191,36,0.6)]' 
