@@ -897,20 +897,44 @@ const Profile = () => {
         setConnectionRequests([]);
         setCommentNotifications([]);
         setReactionNotifications([]);
+        setGiftNotifications([]);
         return;
       }
 
       setNotificationsLoading(true);
       try {
-        // Fetch dismissed notifications first
-        const { data: dismissedNotifs } = await supabase
-          .from("dismissed_notifications")
-          .select("notification_type, notification_id")
-          .eq("user_id", user.id);
+        // Verify user is authenticated
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          console.warn("No session found, skipping dismissed notifications fetch");
+        }
 
-        const dismissedSet = new Set(
-          dismissedNotifs?.map(d => `${d.notification_type}:${d.notification_id}`) || []
-        );
+        // Fetch dismissed notifications first
+        let dismissedSet = new Set<string>();
+        try {
+          const { data: dismissedNotifs, error: dismissedError } = await supabase
+            .from("dismissed_notifications")
+            .select("notification_type, notification_id")
+            .eq("user_id", user.id);
+
+          if (dismissedError) {
+            console.error("Error fetching dismissed notifications:", dismissedError);
+            // If table doesn't exist yet or RLS issue, that's okay - just continue with empty set
+            if (dismissedError.code === '42P01' || dismissedError.message?.includes('does not exist') || dismissedError.code === 'PGRST301') {
+              console.log("Dismissed notifications table doesn't exist yet or RLS issue. Run migration 20240101000011_create_dismissed_notifications.sql");
+            } else {
+              // For other errors, log but continue
+              console.warn("Could not fetch dismissed notifications, continuing without filtering:", dismissedError);
+            }
+          } else if (dismissedNotifs) {
+            dismissedSet = new Set(
+              dismissedNotifs.map(d => `${d.notification_type}:${d.notification_id}`)
+            );
+          }
+        } catch (err) {
+          console.error("Exception fetching dismissed notifications:", err);
+          // Continue with empty set
+        }
 
         // Fetch incoming connection requests (people who connected to you but you haven't connected back)
         const { data: incomingConnections, error: connError } = await supabase
@@ -1082,6 +1106,7 @@ const Profile = () => {
               const giftNotifs = undismissedGifts.map(gift => {
                 const gifterProfile = profileMap.get(gift.gifter_id);
                 return {
+                  id: gift.id, // Include the gift ID for tracking dismissed notifications
                   gifter_id: gift.gifter_id,
                   gifter_name: gifterProfile?.full_name || null,
                   gifter_email: gifterProfile?.email || null,
@@ -1639,69 +1664,120 @@ const Profile = () => {
     try {
       const dismissRecords: Array<{user_id: string, notification_type: string, notification_id: string}> = [];
 
-      // Mark connection requests as dismissed
+      // Mark connection requests as dismissed (only if they have valid IDs)
       if (connectionRequests.length > 0) {
-        connectionRequests.forEach(req => {
-          dismissRecords.push({
-            user_id: user.id,
-            notification_type: 'connection_request',
-            notification_id: req.id
+        connectionRequests
+          .filter(req => req.id && req.id.trim() !== '')
+          .forEach(req => {
+            dismissRecords.push({
+              user_id: user.id,
+              notification_type: 'connection_request',
+              notification_id: req.id
+            });
           });
-        });
       }
 
-      // Mark comments as dismissed
+      // Mark comments as dismissed (only if they have valid IDs)
       if (commentNotifications.length > 0) {
-        commentNotifications.forEach(comment => {
-          dismissRecords.push({
-            user_id: user.id,
-            notification_type: 'comment',
-            notification_id: comment.id
+        commentNotifications
+          .filter(comment => comment.id && comment.id.trim() !== '')
+          .forEach(comment => {
+            dismissRecords.push({
+              user_id: user.id,
+              notification_type: 'comment',
+              notification_id: comment.id
+            });
           });
-        });
       }
 
-      // Mark reactions as dismissed
+      // Mark reactions as dismissed (only if they have valid IDs)
       if (reactionNotifications.length > 0) {
-        reactionNotifications.forEach(reaction => {
-          dismissRecords.push({
-            user_id: user.id,
-            notification_type: 'reaction',
-            notification_id: reaction.id
+        reactionNotifications
+          .filter(reaction => reaction.id && reaction.id.trim() !== '')
+          .forEach(reaction => {
+            dismissRecords.push({
+              user_id: user.id,
+              notification_type: 'reaction',
+              notification_id: reaction.id
+            });
           });
-        });
       }
 
-      // Mark gifts as dismissed
+      // Mark gifts as dismissed (only if they have valid IDs)
       if (giftNotifications.length > 0) {
-        giftNotifications.forEach(gift => {
-          dismissRecords.push({
-            user_id: user.id,
-            notification_type: 'gift',
-            notification_id: gift.id
+        giftNotifications
+          .filter(gift => gift.id && gift.id.trim() !== '')
+          .forEach(gift => {
+            dismissRecords.push({
+              user_id: user.id,
+              notification_type: 'gift',
+              notification_id: gift.id
+            });
           });
-        });
       }
 
-      // Insert all dismiss records
-      if (dismissRecords.length > 0) {
-        const { error: dismissError } = await supabase
-          .from("dismissed_notifications")
-          .insert(dismissRecords);
-
-        if (dismissError) {
-          console.error("Error dismissing notifications:", dismissError);
-          // Continue anyway to clear from UI
+      // Filter out any records with invalid notification_ids before inserting
+      const validDismissRecords = dismissRecords.filter(record => {
+        if (!record.notification_id || typeof record.notification_id !== 'string' || record.notification_id.trim() === '') {
+          console.warn("Skipping dismiss record with invalid notification_id:", record);
+          return false;
         }
+        // Basic UUID validation (format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (!uuidRegex.test(record.notification_id)) {
+          console.warn("Skipping dismiss record with invalid UUID format:", record);
+          return false;
+        }
+        return true;
+      });
+
+      // Insert all dismiss records (in batches to avoid issues)
+      let insertSuccess = true;
+      if (validDismissRecords.length > 0) {
+        try {
+          // Insert in batches of 50 to avoid potential issues
+          const batchSize = 50;
+          for (let i = 0; i < validDismissRecords.length; i += batchSize) {
+            const batch = validDismissRecords.slice(i, i + batchSize);
+            const { error: dismissError } = await supabase
+              .from("dismissed_notifications")
+              .insert(batch);
+
+            if (dismissError) {
+              console.error(`Error dismissing notifications batch ${i / batchSize + 1}:`, dismissError);
+              console.error("Error details:", {
+                code: dismissError.code,
+                message: dismissError.message,
+                details: dismissError.details,
+                hint: dismissError.hint
+              });
+              console.error("Batch:", batch);
+              // If it's a unique constraint violation, that's okay - it means it's already dismissed
+              if (dismissError.code !== '23505') {
+                insertSuccess = false;
+                toast.error(`Failed to save some dismissed notifications: ${dismissError.message}`);
+              }
+            }
+          }
+        } catch (err) {
+          console.error("Exception dismissing notifications:", err);
+          insertSuccess = false;
+          toast.error("Failed to save dismissed notifications");
+        }
+      } else if (dismissRecords.length > 0) {
+        // If we had records but none were valid, warn the user
+        console.warn("No valid notification IDs found to dismiss");
+        insertSuccess = false;
       }
 
-      // Clear from local state
-      setConnectionRequests([]);
-      setCommentNotifications([]);
-      setReactionNotifications([]);
-      setGiftNotifications([]);
-      
-      toast.success("All notifications cleared");
+      // Only clear from local state if insert was successful (or if there were no records to insert)
+      if (insertSuccess || dismissRecords.length === 0) {
+        setConnectionRequests([]);
+        setCommentNotifications([]);
+        setReactionNotifications([]);
+        setGiftNotifications([]);
+        toast.success("All notifications cleared");
+      }
     } catch (error) {
       console.error("Error clearing notifications:", error);
       toast.error("Failed to clear some notifications");
@@ -2089,7 +2165,7 @@ const Profile = () => {
                       ) : (
                         <>
                           {connectionRequests.map((request) => (
-                            <div key={request.id} className="p-4 border-[2px] border-foreground rounded-md bg-secondary">
+                            <div key={`connection-${request.id}`} className="p-4 border-[2px] border-foreground rounded-md bg-secondary">
                               <div className="flex items-start justify-between">
                                 <div className="flex-1">
                                   <div className="flex items-center gap-2 mb-1">
@@ -2131,7 +2207,7 @@ const Profile = () => {
                             </div>
                           ))}
                           {commentNotifications.map((comment) => (
-                            <div key={comment.id} className="p-4 border-[2px] border-foreground rounded-md bg-secondary">
+                            <div key={`comment-${comment.id}`} className="p-4 border-[2px] border-foreground rounded-md bg-secondary">
                               <div className="flex items-start gap-3">
                                 <MessageSquare className="w-4 h-4 text-primary mt-1" />
                                 <div className="flex-1">
@@ -2153,7 +2229,7 @@ const Profile = () => {
                             </div>
                           ))}
                           {reactionNotifications.map((reaction) => (
-                            <div key={reaction.id} className="p-4 border-[2px] border-foreground rounded-md bg-secondary">
+                            <div key={`reaction-${reaction.id}`} className="p-4 border-[2px] border-foreground rounded-md bg-secondary">
                               <div className="flex items-start gap-3">
                                 <ThumbsUp className={`w-4 h-4 mt-1 ${reaction.reaction_type === 'like' ? 'text-primary' : 'text-muted-foreground'}`} />
                                 <div className="flex-1">
@@ -2173,8 +2249,8 @@ const Profile = () => {
                               </div>
                             </div>
                           ))}
-                          {giftNotifications.map((gift) => (
-                            <div key={gift.id} className="p-4 border-[2px] border-foreground rounded-md bg-secondary">
+                          {giftNotifications.filter(gift => gift.id).map((gift) => (
+                            <div key={`gift-${gift.id}`} className="p-4 border-[2px] border-foreground rounded-md bg-secondary">
                               <div className="flex items-start gap-3">
                                 <Gift className="w-4 h-4 text-primary mt-1" />
                                 <div className="flex-1">
@@ -2203,7 +2279,7 @@ const Profile = () => {
                         </div>
                       ) : (
                         connectionRequests.map((request) => (
-                          <div key={request.id} className="p-4 border-[2px] border-foreground rounded-md bg-secondary">
+                          <div key={`connection-${request.id}`} className="p-4 border-[2px] border-foreground rounded-md bg-secondary">
                             <div className="flex items-start justify-between">
                               <div className="flex-1">
                                 <div className="flex items-center gap-2 mb-1">
@@ -2255,7 +2331,7 @@ const Profile = () => {
                         </div>
                       ) : (
                         commentNotifications.map((comment) => (
-                          <div key={comment.id} className="p-4 border-[2px] border-foreground rounded-md bg-secondary">
+                          <div key={`comment-${comment.id}`} className="p-4 border-[2px] border-foreground rounded-md bg-secondary">
                             <div className="flex items-start gap-3">
                               <MessageSquare className="w-4 h-4 text-primary mt-1" />
                               <div className="flex-1">
@@ -2287,7 +2363,7 @@ const Profile = () => {
                         </div>
                       ) : (
                         reactionNotifications.map((reaction) => (
-                          <div key={reaction.id} className="p-4 border-[2px] border-foreground rounded-md bg-secondary">
+                          <div key={`reaction-${reaction.id}`} className="p-4 border-[2px] border-foreground rounded-md bg-secondary">
                             <div className="flex items-start gap-3">
                               <ThumbsUp className={`w-4 h-4 mt-1 ${reaction.reaction_type === 'like' ? 'text-primary' : 'text-muted-foreground'}`} />
                               <div className="flex-1">
@@ -2316,8 +2392,8 @@ const Profile = () => {
                           <p>No gifts received yet</p>
                         </div>
                       ) : (
-                        giftNotifications.map((gift) => (
-                          <div key={gift.id} className="p-4 border-[2px] border-foreground rounded-md bg-secondary">
+                        giftNotifications.filter(gift => gift.id).map((gift) => (
+                          <div key={`gift-${gift.id}`} className="p-4 border-[2px] border-foreground rounded-md bg-secondary">
                             <div className="flex items-start gap-3">
                               <Gift className="w-4 h-4 text-primary mt-1" />
                               <div className="flex-1">
