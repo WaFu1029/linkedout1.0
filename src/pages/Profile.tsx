@@ -166,6 +166,7 @@ const Profile = () => {
   const [connectionRequests, setConnectionRequests] = useState<Array<{id: string, user_id: string, full_name: string | null, email: string | null, industry: string | null, created_at: string}>>([]);
   const [commentNotifications, setCommentNotifications] = useState<Array<{id: string, post_id: string, author_id: string, author_name: string | null, author_email: string | null, content: string, created_at: string, post_title: string | null}>>([]);
   const [reactionNotifications, setReactionNotifications] = useState<Array<{id: string, post_id: string, user_id: string, user_name: string | null, user_email: string | null, reaction_type: string, created_at: string, post_title: string | null}>>([]);
+  const [giftNotifications, setGiftNotifications] = useState<Array<{gifter_id: string, gifter_name: string | null, gifter_email: string | null, emoji: string, quantity: number, created_at: string}>>([]);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   
   // Emoji garden grid state - supports both old format (string) and new format (object)
@@ -373,11 +374,11 @@ const Profile = () => {
       return;
     }
 
-    // Fetch recipient's garden to find empty cells
+    // Fetch recipient's inventory
     try {
       const { data: recipientProfile, error: fetchError } = await supabase
         .from("profiles")
-        .select("garden_grid, gifts_received")
+        .select("inventory, gifts_received")
         .eq("id", friendId)
         .single();
 
@@ -390,46 +391,35 @@ const Profile = () => {
         return;
       }
 
-      // Parse recipient's garden grid
-      let recipientGrid: (GardenCell | string | null)[][] = [];
-      if (recipientProfile.garden_grid && Array.isArray(recipientProfile.garden_grid)) {
-        recipientGrid = recipientProfile.garden_grid.map((row: any[]) =>
-          row.map((cell: any) => {
-            if (!cell) return null;
-            if (typeof cell === 'string') return { emoji: cell, gifted: false };
-            return cell;
-          })
+      // Parse recipient's inventory
+      let recipientInventory: InventoryItem[] = [];
+      if (recipientProfile.inventory && Array.isArray(recipientProfile.inventory)) {
+        recipientInventory = recipientProfile.inventory.map((item: any) => ({
+          emoji: item.emoji,
+          count: typeof item.count === 'number' ? item.count : 1
+        }));
+      }
+
+      // Add gifts to recipient's inventory
+      const existingItem = recipientInventory.find(item => item.emoji === emoji);
+      let newRecipientInventory: InventoryItem[];
+      
+      if (existingItem) {
+        // Increment count if item already exists
+        newRecipientInventory = recipientInventory.map(item =>
+          item.emoji === emoji
+            ? { ...item, count: item.count + quantity }
+            : item
         );
       } else {
-        // Initialize empty grid if none exists
-        recipientGrid = Array(6).fill(null).map(() => Array(8).fill(null));
+        // Add new item if it doesn't exist
+        newRecipientInventory = [...recipientInventory, { emoji, count: quantity }];
       }
 
-      // Find multiple random empty cells
-      const emptyCells: Array<{row: number, col: number}> = [];
-      const tempGrid = recipientGrid.map(row => [...row]); // Copy grid for finding cells
-      
-      for (let i = 0; i < quantity; i++) {
-        const emptyCell = findRandomEmptyCell(tempGrid);
-        if (!emptyCell) {
-          toast.error(`Their garden doesn't have enough space! Only ${emptyCells.length} empty cells available.`);
-          return;
-        }
-        emptyCells.push(emptyCell);
-        // Mark this cell as occupied in temp grid
-        tempGrid[emptyCell.row][emptyCell.col] = { emoji, gifted: true };
-      }
-
-      // Place gifts in random empty cells
-      let newRecipientGrid = recipientGrid;
-      emptyCells.forEach(({ row, col }) => {
-        const giftCell: GardenCell = { emoji, gifted: true };
-        newRecipientGrid = newRecipientGrid.map((r, rIdx) =>
-          rIdx === row
-            ? r.map((cell, cIdx) => (cIdx === col ? giftCell : cell))
-            : r
-        );
-      });
+      const cleanRecipientInventory = newRecipientInventory.map(item => ({
+        emoji: item.emoji,
+        count: item.count
+      }));
 
       // Update gifter's inventory (decrement by quantity, remove if 0)
       const newInventory = inventory.map(item => {
@@ -444,16 +434,19 @@ const Profile = () => {
         count: item.count
       }));
 
-      // Update recipient's garden and gifts_received
+      // Update recipient's inventory and gifts_received
       const { error: recipientError } = await supabase
         .from("profiles")
         .update({
-          garden_grid: newRecipientGrid,
+          inventory: cleanRecipientInventory,
           gifts_received: (recipientProfile.gifts_received || 0) + quantity,
         })
         .eq("id", friendId);
 
-      if (recipientError) throw recipientError;
+      if (recipientError) {
+        console.error("Error updating recipient inventory:", recipientError);
+        throw recipientError;
+      }
 
       // Update gifter's inventory
       const { error: gifterError } = await supabase
@@ -1013,6 +1006,23 @@ const Profile = () => {
         } else {
           setReactionNotifications([]);
         }
+
+        // Fetch gift notifications - check if gifts_received > 0
+        // Note: In a production app, you'd want a separate gifts table with gifter info and timestamps
+        // For now, we'll show a notification if gifts_received count is > 0
+        if (profile?.gifts_received && profile.gifts_received > 0) {
+          // Since we don't have individual gift records, show a summary notification
+          setGiftNotifications([{
+            gifter_id: '',
+            gifter_name: null,
+            gifter_email: null,
+            emoji: '🎁',
+            quantity: profile.gifts_received,
+            created_at: new Date().toISOString()
+          }]);
+        } else {
+          setGiftNotifications([]);
+        }
       } catch (error) {
         console.error("Error fetching notifications:", error);
       } finally {
@@ -1021,7 +1031,7 @@ const Profile = () => {
     };
 
     fetchNotifications();
-  }, [isOwnProfile, user?.id]);
+  }, [isOwnProfile, user?.id, profile?.gifts_received]);
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -1887,9 +1897,9 @@ const Profile = () => {
                   </div>
                 ) : (
                   <Tabs defaultValue="all" className="w-full">
-                    <TabsList className="grid w-full grid-cols-4 border-[3px] border-foreground mb-4">
+                    <TabsList className="grid w-full grid-cols-5 border-[3px] border-foreground mb-4">
                       <TabsTrigger value="all" className="border-r-[3px] border-foreground last:border-r-0">
-                        All ({connectionRequests.length + commentNotifications.length + reactionNotifications.length})
+                        All ({connectionRequests.length + commentNotifications.length + reactionNotifications.length + giftNotifications.length})
                       </TabsTrigger>
                       <TabsTrigger value="connections" className="border-r-[3px] border-foreground last:border-r-0">
                         Requests ({connectionRequests.length})
@@ -1897,13 +1907,16 @@ const Profile = () => {
                       <TabsTrigger value="comments" className="border-r-[3px] border-foreground last:border-r-0">
                         Comments ({commentNotifications.length})
                       </TabsTrigger>
-                      <TabsTrigger value="reactions">
+                      <TabsTrigger value="reactions" className="border-r-[3px] border-foreground last:border-r-0">
                         Reactions ({reactionNotifications.length})
+                      </TabsTrigger>
+                      <TabsTrigger value="gifts">
+                        Gifts ({giftNotifications.length})
                       </TabsTrigger>
                     </TabsList>
 
                     <TabsContent value="all" className="space-y-3">
-                      {connectionRequests.length === 0 && commentNotifications.length === 0 && reactionNotifications.length === 0 ? (
+                      {connectionRequests.length === 0 && commentNotifications.length === 0 && reactionNotifications.length === 0 && giftNotifications.length === 0 ? (
                         <div className="text-center py-8 text-muted-foreground">
                           <Bell className="w-12 h-12 mx-auto mb-2 opacity-50" />
                           <p>No notifications yet</p>
@@ -1990,6 +2003,22 @@ const Profile = () => {
                                   </p>
                                   <p className="text-xs text-muted-foreground mt-1">
                                     {formatDistanceToNow(new Date(reaction.created_at), { addSuffix: true })}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                          {giftNotifications.map((gift, index) => (
+                            <div key={index} className="p-4 border-[2px] border-foreground rounded-md bg-secondary">
+                              <div className="flex items-start gap-3">
+                                <Gift className="w-4 h-4 text-primary mt-1" />
+                                <div className="flex-1">
+                                  <p className="text-sm">
+                                    {gift.gifter_name || gift.gifter_email?.split("@")[0] || "Someone"} 
+                                    {" "}gifted you {gift.quantity}x {gift.emoji}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    Check your garden to see the gifts!
                                   </p>
                                 </div>
                               </div>
@@ -2106,6 +2135,31 @@ const Profile = () => {
                                 </p>
                                 <p className="text-xs text-muted-foreground mt-1">
                                   {formatDistanceToNow(new Date(reaction.created_at), { addSuffix: true })}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </TabsContent>
+                    <TabsContent value="gifts" className="space-y-3">
+                      {giftNotifications.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                          <Gift className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                          <p>No gifts received yet</p>
+                        </div>
+                      ) : (
+                        giftNotifications.map((gift, index) => (
+                          <div key={index} className="p-4 border-[2px] border-foreground rounded-md bg-secondary">
+                            <div className="flex items-start gap-3">
+                              <Gift className="w-4 h-4 text-primary mt-1" />
+                              <div className="flex-1">
+                                <p className="text-sm">
+                                  {gift.gifter_name || gift.gifter_email?.split("@")[0] || "Someone"} 
+                                  {" "}gifted you {gift.quantity}x {gift.emoji}
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Check your garden to see the gifts!
                                 </p>
                               </div>
                             </div>
