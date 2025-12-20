@@ -31,9 +31,10 @@ interface ProfileSidebarProps {
 export function ProfileSidebar({ profile, post }: ProfileSidebarProps) {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [isFollowing, setIsFollowing] = useState(false);
-  const [isFollowingLoading, setIsFollowingLoading] = useState(false);
-  const [isCheckingFollow, setIsCheckingFollow] = useState(true);
+  const [isConnected, setIsConnected] = useState(false);
+  const [isPending, setIsPending] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [isCheckingConnection, setIsCheckingConnection] = useState(true);
 
   if (!post) return null;
 
@@ -42,35 +43,49 @@ export function ProfileSidebar({ profile, post }: ProfileSidebarProps) {
   const profileId = profile?.id;
   const isOwnProfile = user?.id === profileId;
 
-  // Check if current user is following this profile
+  // Check connection status
   useEffect(() => {
-    const checkFollowing = async () => {
+    const checkConnectionStatus = async () => {
       if (!user || !profileId || isOwnProfile) {
-        setIsFollowing(false);
-        setIsCheckingFollow(false);
+        setIsConnected(false);
+        setIsPending(false);
+        setIsCheckingConnection(false);
         return;
       }
 
       try {
-        // @ts-ignore - followers table types will be available after migration
-        const { data } = await supabase.from("followers")
+        // Check if current user has connected to this profile
+        const { data: userToProfile } = await supabase
+          .from("connections")
           .select("id")
-          .eq("follower_id", user.id)
-          .eq("following_id", profileId)
+          .eq("user_id", user.id)
+          .eq("connected_user_id", profileId)
           .single();
 
-        setIsFollowing(!!data);
+        // Check if this profile has connected back to current user
+        const { data: profileToUser } = await supabase
+          .from("connections")
+          .select("id")
+          .eq("user_id", profileId)
+          .eq("connected_user_id", user.id)
+          .single();
+
+        // Mutual connection exists only if both directions exist
+        setIsConnected(!!userToProfile && !!profileToUser);
+        // Pending if user sent connection but profile hasn't connected back
+        setIsPending(!!userToProfile && !profileToUser);
       } catch (error) {
-        setIsFollowing(false);
+        setIsConnected(false);
+        setIsPending(false);
       } finally {
-        setIsCheckingFollow(false);
+        setIsCheckingConnection(false);
       }
     };
 
-    checkFollowing();
+    checkConnectionStatus();
   }, [profileId, user, isOwnProfile]);
 
-  const handleFollow = async () => {
+  const handleConnect = async () => {
     if (!user) {
       toast.error("Create an account to interact with other users", {
         action: {
@@ -81,39 +96,56 @@ export function ProfileSidebar({ profile, post }: ProfileSidebarProps) {
       return;
     }
     
-    if (!profileId || isOwnProfile || isFollowingLoading) return;
+    if (!profileId || isOwnProfile || isConnecting) return;
 
-    setIsFollowingLoading(true);
+    setIsConnecting(true);
     try {
-      if (isFollowing) {
-        // Unfollow
-        // @ts-ignore - followers table types will be available after migration
-        const { error } = await supabase.from("followers")
+      if (isConnected || isPending) {
+        // Disconnect - remove the connection from current user to profile
+        const { error } = await supabase
+          .from("connections")
           .delete()
-          .eq("follower_id", user.id)
-          .eq("following_id", profileId);
+          .eq("user_id", user.id)
+          .eq("connected_user_id", profileId);
 
         if (error) throw error;
-        setIsFollowing(false);
-        toast.success("Unfollowed");
+        setIsConnected(false);
+        setIsPending(false);
+        toast.success("Disconnected");
       } else {
-        // Follow
-        // @ts-ignore - followers table types will be available after migration
-        const { error } = await (supabase as any).from("followers")
+        // Connect - create connection from current user to profile
+        const { error } = await supabase
+          .from("connections")
           .insert({
-            follower_id: user.id,
-            following_id: profileId,
+            user_id: user.id,
+            connected_user_id: profileId,
           });
 
         if (error) throw error;
-        setIsFollowing(true);
-        toast.success("Following");
+        
+        // Check if mutual connection now exists
+        const { data: reverseConnection } = await supabase
+          .from("connections")
+          .select("id")
+          .eq("user_id", profileId)
+          .eq("connected_user_id", user.id)
+          .single();
+
+        if (reverseConnection) {
+          setIsConnected(true);
+          setIsPending(false);
+          toast.success("Connected!");
+        } else {
+          setIsPending(true);
+          setIsConnected(false);
+          toast.success("Connection request sent");
+        }
       }
     } catch (error) {
-      console.error("Error following/unfollowing:", error);
-      toast.error("Failed to update follow status");
+      console.error("Error connecting/disconnecting:", error);
+      toast.error("Failed to update connection status");
     } finally {
-      setIsFollowingLoading(false);
+      setIsConnecting(false);
     }
   };
 
@@ -156,30 +188,35 @@ export function ProfileSidebar({ profile, post }: ProfileSidebarProps) {
         </div>
       )}
 
-      {/* Follow Button and View Full Profile Link */}
+      {/* Connect Button and View Full Profile Link */}
       {post.author_email && (
         <div className="mt-auto space-y-2">
           {!isOwnProfile && profileId && (
             <Button
-              onClick={handleFollow}
-              disabled={isFollowingLoading || isCheckingFollow}
-              variant={isFollowing ? "outline" : "default"}
+              onClick={handleConnect}
+              disabled={isConnecting || isCheckingConnection}
+              variant={isConnected ? "outline" : "default"}
               className={`w-full border-[3px] border-foreground shadow-brutal ${!user ? "opacity-50 cursor-not-allowed" : ""}`}
             >
-              {isFollowingLoading ? (
+              {isConnecting ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  {isFollowing ? "Unfollowing..." : "Following..."}
+                  {isConnected || isPending ? "Disconnecting..." : "Connecting..."}
                 </>
-              ) : isFollowing ? (
+              ) : isConnected ? (
                 <>
                   <UserMinus className="w-4 h-4 mr-2" />
-                  Unfollow
+                  Disconnect
+                </>
+              ) : isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2" />
+                  Pending
                 </>
               ) : (
                 <>
                   <UserPlus className="w-4 h-4 mr-2" />
-                  Follow
+                  Connect
                 </>
               )}
             </Button>
