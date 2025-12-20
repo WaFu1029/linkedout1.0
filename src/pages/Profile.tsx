@@ -445,8 +445,13 @@ const Profile = () => {
 
       if (recipientError) {
         console.error("Error updating recipient inventory:", recipientError);
+        console.error("Recipient ID:", friendId);
+        console.error("Current user ID:", user.id);
+        console.error("Recipient inventory data:", JSON.stringify(cleanRecipientInventory, null, 2));
         throw recipientError;
       }
+      
+      console.log(`Successfully updated recipient ${friendId}'s inventory with ${quantity}x ${emoji}`);
 
       // Update gifter's inventory
       const { error: gifterError } = await supabase
