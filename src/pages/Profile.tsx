@@ -28,6 +28,7 @@ import {
   ShoppingCart,
   X as XIcon,
   Gift,
+  DollarSign,
   Package,
   Flame,
   Bell,
@@ -319,6 +320,73 @@ const Profile = () => {
   };
 
   // Delete item from inventory
+  const handleSellFromInventory = async (emoji: string) => {
+    if (!user || !isOwnProfile || !profile?.id) return;
+
+    // Check if user has this vegetable in inventory
+    const inventoryItem = inventory.find(item => item.emoji === emoji);
+    if (!inventoryItem || inventoryItem.count <= 0) {
+      toast.error(`You don't have ${emoji} in your inventory!`);
+      return;
+    }
+
+    // Find the item in shop to get its original cost
+    const shopItem = allVegetables.find(v => v.emoji === emoji);
+    if (!shopItem) {
+      toast.error(`Cannot sell ${emoji} - item not found in shop!`);
+      return;
+    }
+
+    // Calculate sell price (1.5x original cost)
+    const sellPrice = Math.floor(shopItem.cost * 1.5);
+    const newPoints = points + sellPrice;
+
+    // Remove one from inventory (or remove entirely if count is 1)
+    const newInventory = inventory.map(item => {
+      if (item.emoji === emoji) {
+        return { ...item, count: item.count - 1 };
+      }
+      return item;
+    }).filter(item => item.count > 0);
+
+    const cleanInventory = newInventory.map(item => ({
+      emoji: item.emoji,
+      count: item.count
+    }));
+
+    // Update local state immediately
+    setInventory(newInventory);
+    setPoints(newPoints);
+
+    // Update inventory and points in database
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          inventory: cleanInventory,
+          garden_points: newPoints,
+        })
+        .eq("id", user.id);
+
+      if (error) {
+        // Revert on error
+        setInventory(inventory);
+        setPoints(points);
+        console.error("Error selling from inventory:", error);
+        toast.error("Failed to sell item");
+      } else {
+        setInventoryPopoverOpen(null);
+        toast.success(`Sold ${emoji} for ${sellPrice} points!`);
+      }
+    } catch (error) {
+      // Revert on error
+      setInventory(inventory);
+      setPoints(points);
+      console.error("Error selling from inventory:", error);
+      toast.error("Failed to sell item");
+    }
+  };
+
   const handleDeleteFromInventory = async (emoji: string) => {
     if (!user || !isOwnProfile) return;
 
@@ -2915,6 +2983,13 @@ const Profile = () => {
                             <PopoverContent className="w-auto p-2 border-[3px] border-foreground shadow-brutal bg-gray-900">
                               <div className="flex flex-col gap-2">
                                 <p className="text-sm font-semibold text-white mb-1">{item.emoji} (x{item.count})</p>
+                                {(() => {
+                                  const shopItem = allVegetables.find(v => v.emoji === item.emoji);
+                                  const sellPrice = shopItem ? Math.floor(shopItem.cost * 1.5) : 0;
+                                  return shopItem ? (
+                                    <p className="text-xs text-gray-400 mb-1">Sell for {sellPrice} points</p>
+                                  ) : null;
+                                })()}
                                 <div className="flex flex-col gap-2">
                                   <Button
                                     onClick={() => {
@@ -2930,6 +3005,22 @@ const Profile = () => {
                                     Plant
                                   </Button>
                                   <div className="flex gap-2">
+                                    <Button
+                                      onClick={() => {
+                                        const shopItem = allVegetables.find(v => v.emoji === item.emoji);
+                                        if (shopItem) {
+                                          handleSellFromInventory(item.emoji);
+                                          setInventoryPopoverOpen(null);
+                                        } else {
+                                          toast.error("Cannot sell this item - not found in shop!");
+                                        }
+                                      }}
+                                      size="sm"
+                                      className="border-[3px] border-foreground flex-1 bg-green-600 hover:bg-green-700"
+                                    >
+                                      <DollarSign className="w-3 h-3 mr-1" />
+                                      Sell
+                                    </Button>
                                     <Button
                                       onClick={() => {
                                         setVegetableToGift(item.emoji);
