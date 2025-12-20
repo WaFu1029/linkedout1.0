@@ -2511,7 +2511,7 @@ const Profile = () => {
                   </p>
                 </Card>
               ) : (
-                <div className="relative overflow-hidden">
+                <div className="relative">
   <Carousel
     opts={{
       align: "start",
