@@ -115,6 +115,8 @@ const industries = [
 interface GardenCell {
   emoji: string;
   gifted?: boolean;
+  plantedAt?: string; // ISO timestamp when plant was planted
+  growthProgress?: number; // 0-1, where 1 means fully grown
 }
 
 interface InventoryItem {
@@ -299,6 +301,52 @@ const Profile = () => {
     }
     
     return newInventory;
+  };
+
+  // Helper function to calculate growth time in milliseconds based on shop price
+  // Growth time = price * 60 seconds (1 minute per point)
+  const getGrowthTime = (price: number): number => {
+    return price * 60 * 1000; // Convert to milliseconds
+  };
+
+  // Helper function to calculate growth progress (0-1)
+  const calculateGrowthProgress = (plantedAt: string, growthTime: number): number => {
+    const now = new Date().getTime();
+    const planted = new Date(plantedAt).getTime();
+    const elapsed = now - planted;
+    return Math.min(1, elapsed / growthTime);
+  };
+
+  // Helper function to check if plant is fully grown
+  const isFullyGrown = (cell: GardenCell | string | null): boolean => {
+    if (!cell || typeof cell === 'string') return true; // Legacy format, assume grown
+    if (!cell.plantedAt) return true; // No planting time, assume grown (backward compatibility)
+    const shopItem = allVegetables.find(v => v.emoji === cell.emoji);
+    if (!shopItem) return true; // Not in shop, assume grown
+    const growthTime = getGrowthTime(shopItem.cost);
+    const progress = calculateGrowthProgress(cell.plantedAt, growthTime);
+    return progress >= 1;
+  };
+
+  // Helper function to update growth progress for all plants
+  const updateGrowthProgress = (grid: (GardenCell | string | null)[][]): (GardenCell | string | null)[][] => {
+    return grid.map(row =>
+      row.map(cell => {
+        if (!cell || typeof cell === 'string') return cell;
+        if (!cell.plantedAt) return cell;
+        
+        const shopItem = allVegetables.find(v => v.emoji === cell.emoji);
+        if (!shopItem) return cell;
+        
+        const growthTime = getGrowthTime(shopItem.cost);
+        const progress = calculateGrowthProgress(cell.plantedAt, growthTime);
+        
+        return {
+          ...cell,
+          growthProgress: progress
+        };
+      })
+    );
   };
 
   // Helper function to find random empty cell in garden grid
@@ -583,6 +631,21 @@ const Profile = () => {
     
     if (!cellEmoji) return;
 
+    // Check if plant is fully grown
+    if (!isFullyGrown(cell)) {
+      const shopItem = allVegetables.find(v => v.emoji === cellEmoji);
+      if (shopItem && typeof cell === 'object' && cell.plantedAt) {
+        const growthTime = getGrowthTime(shopItem.cost);
+        const progress = calculateGrowthProgress(cell.plantedAt, growthTime);
+        const remainingMs = growthTime * (1 - progress);
+        const remainingMinutes = Math.ceil(remainingMs / (60 * 1000));
+        toast.error(`This plant is still growing! ${remainingMinutes} minute(s) remaining.`);
+      } else {
+        toast.error("This plant is still growing!");
+      }
+      return;
+    }
+
     // Close popover
     setHarvestPopoverOpen(null);
 
@@ -641,9 +704,23 @@ const Profile = () => {
     const cell = gardenGrid[rowIndex][colIndex];
     const cellEmoji = getCellEmoji(cell);
 
-    // If clicking on an occupied cell in own garden, show harvest popover
+    // If clicking on an occupied cell in own garden, show harvest popover (only if fully grown)
     if (cellEmoji && isOwnProfile && !selectedVegetable && !selectedInventoryItem) {
-      setHarvestPopoverOpen({ row: rowIndex, col: colIndex });
+      if (isFullyGrown(cell)) {
+        setHarvestPopoverOpen({ row: rowIndex, col: colIndex });
+      } else {
+        // Show growth status message
+        const shopItem = allVegetables.find(v => v.emoji === cellEmoji);
+        if (shopItem && typeof cell === 'object' && cell.plantedAt) {
+          const growthTime = getGrowthTime(shopItem.cost);
+          const progress = calculateGrowthProgress(cell.plantedAt, growthTime);
+          const remainingMs = growthTime * (1 - progress);
+          const remainingMinutes = Math.ceil(remainingMs / (60 * 1000));
+          toast.info(`This plant is still growing! ${remainingMinutes} minute(s) remaining.`);
+        } else {
+          toast.info("This plant is still growing!");
+        }
+      }
       return;
     }
 
@@ -667,7 +744,13 @@ const Profile = () => {
       }
       
       // Plant from inventory (not gifted)
-      const plantCell: GardenCell = { emoji: selectedInventoryItem, gifted: false };
+      const shopItem = allVegetables.find(v => v.emoji === selectedInventoryItem);
+      const plantCell: GardenCell = { 
+        emoji: selectedInventoryItem, 
+        gifted: false,
+        plantedAt: new Date().toISOString(),
+        growthProgress: 0
+      };
       const newGrid = gardenGrid.map((row, r) =>
         r === rowIndex
           ? row.map((cell, c) => (c === colIndex ? plantCell : cell))
@@ -1279,6 +1362,17 @@ const Profile = () => {
     fetchNotifications();
   }, [isOwnProfile, user?.id]);
 
+  // Update growth progress while user is active
+  useEffect(() => {
+    if (!isOwnProfile || gardenLoading) return;
+
+    const interval = setInterval(() => {
+      setGardenGrid(prevGrid => updateGrowthProgress(prevGrid));
+    }, 5000); // Update every 5 seconds
+
+    return () => clearInterval(interval);
+  }, [isOwnProfile, gardenLoading]);
+
   useEffect(() => {
     const loadProfile = async () => {
       try {
@@ -1423,13 +1517,15 @@ const Profile = () => {
           // Initialize garden data from profile
           if (data.garden_grid && Array.isArray(data.garden_grid)) {
             // Normalize garden grid to handle both old (string) and new (object) formats
-            const normalizedGrid = data.garden_grid.map((row: any[]) =>
+            let normalizedGrid = data.garden_grid.map((row: any[]) =>
               row.map((cell: any) => {
                 if (!cell) return null;
                 if (typeof cell === 'string') return { emoji: cell, gifted: false };
                 return cell;
               })
             );
+            // Update growth progress for all plants (this calculates based on current time, including offline time)
+            normalizedGrid = updateGrowthProgress(normalizedGrid);
             setGardenGrid(normalizedGrid);
           }
           if (data.garden_points !== null && data.garden_points !== undefined) {
@@ -2733,9 +2829,20 @@ const Profile = () => {
                       row.map((cell, colIndex) => {
                         const cellEmoji = getCellEmoji(cell);
                         const isGifted = isCellGifted(cell);
+                        const isFullyGrownCell = isFullyGrown(cell);
                         const canPlant = isOwnProfile && !cellEmoji && !gardenLoading && (selectedVegetable || selectedInventoryItem);
-                        const canHarvest = isOwnProfile && cellEmoji && !selectedVegetable && !selectedInventoryItem && !gardenLoading;
+                        const canHarvest = isOwnProfile && cellEmoji && isFullyGrownCell && !selectedVegetable && !selectedInventoryItem && !gardenLoading && isFullyGrown(cell);
                         const isPopoverOpen = harvestPopoverOpen?.row === rowIndex && harvestPopoverOpen?.col === colIndex;
+                        
+                        // Get growth progress for display
+                        let growthProgress = 1;
+                        if (cell && typeof cell === 'object' && cell.plantedAt) {
+                          const shopItem = allVegetables.find(v => v.emoji === cellEmoji);
+                          if (shopItem) {
+                            const growthTime = getGrowthTime(shopItem.cost);
+                            growthProgress = calculateGrowthProgress(cell.plantedAt, growthTime);
+                          }
+                        }
                         
                         if (canHarvest) {
                           return (
@@ -2762,15 +2869,35 @@ const Profile = () => {
                                   {isGifted && (
                                     <span className="absolute top-0 right-0 text-xs">✨</span>
                                   )}
+                                  {!isFullyGrownCell && (
+                                    <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                                      <span className="text-xs font-bold">🌱</span>
+                                    </div>
+                                  )}
                                 </button>
                               </PopoverTrigger>
                               <PopoverContent className="w-auto p-2 border-[3px] border-foreground shadow-brutal">
                                 <div className="flex flex-col gap-2">
                                   <p className="text-sm font-semibold">Harvest {cellEmoji}?</p>
+                                  {!isFullyGrownCell && (
+                                    <p className="text-xs text-muted-foreground">
+                                      {(() => {
+                                        const shopItem = allVegetables.find(v => v.emoji === cellEmoji);
+                                        if (shopItem && cell && typeof cell === 'object' && cell.plantedAt) {
+                                          const growthTime = getGrowthTime(shopItem.cost);
+                                          const remainingMs = growthTime * (1 - growthProgress);
+                                          const remainingMinutes = Math.ceil(remainingMs / (60 * 1000));
+                                          return `${remainingMinutes} minute(s) remaining`;
+                                        }
+                                        return "Still growing...";
+                                      })()}
+                                    </p>
+                                  )}
                                   <Button
                                     onClick={() => handleHarvest(rowIndex, colIndex)}
                                     size="sm"
                                     className="border-[3px] border-foreground"
+                                    disabled={!isFullyGrownCell}
                                   >
                                     Harvest
                                   </Button>
@@ -2803,6 +2930,19 @@ const Profile = () => {
                                 <span className="text-2xl">{cellEmoji}</span>
                                 {isGifted && (
                                   <span className="absolute top-0 right-0 text-xs">✨</span>
+                                )}
+                                {!isFullyGrownCell && (
+                                  <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                                    <span className="text-xs font-bold">🌱</span>
+                                  </div>
+                                )}
+                                {!isFullyGrownCell && growthProgress < 1 && (
+                                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-800">
+                                    <div 
+                                      className="h-full bg-green-500 transition-all duration-300"
+                                      style={{ width: `${growthProgress * 100}%` }}
+                                    />
+                                  </div>
                                 )}
                               </>
                             )}
@@ -3078,17 +3218,17 @@ const Profile = () => {
                     </DialogDescription>
                   </DialogHeader>
                   <Tabs defaultValue="fruits" className="w-full">
-                    <TabsList className="grid w-full grid-cols-4 border-[3px] border-foreground">
-                      <TabsTrigger value="fruits" className="border-r-[3px] border-foreground last:border-r-0">
+                    <TabsList className="grid w-full grid-cols-4 border-[3px] border-foreground p-0 h-auto">
+                      <TabsTrigger value="fruits" className="border-r-[3px] border-foreground last:border-r-0 flex items-center justify-center py-3 px-2 rounded-none data-[state=active]:rounded-none">
                         🍎 Fruits ({fruits.length})
                       </TabsTrigger>
-                      <TabsTrigger value="vegetables" className="border-r-[3px] border-foreground last:border-r-0">
+                      <TabsTrigger value="vegetables" className="border-r-[3px] border-foreground last:border-r-0 flex items-center justify-center py-3 px-2 rounded-none data-[state=active]:rounded-none">
                         🥕 Vegetables ({vegetables.length})
                       </TabsTrigger>
-                      <TabsTrigger value="flowers" className="border-r-[3px] border-foreground last:border-r-0">
+                      <TabsTrigger value="flowers" className="border-r-[3px] border-foreground last:border-r-0 flex items-center justify-center py-3 px-2 rounded-none data-[state=active]:rounded-none">
                         🌸 Flowers ({flowers.length})
                       </TabsTrigger>
-                      <TabsTrigger value="plants">
+                      <TabsTrigger value="plants" className="flex items-center justify-center py-3 px-2 rounded-none data-[state=active]:rounded-none">
                         🌲 Plants ({plants.length})
                       </TabsTrigger>
                     </TabsList>
