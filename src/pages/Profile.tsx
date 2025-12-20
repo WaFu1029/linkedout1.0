@@ -2757,39 +2757,40 @@ const Profile = () => {
                   </div>
                 )}
                 
-                {selectedInventoryItem && isOwnProfile && (
-                  <div className="mb-3 p-3 bg-primary/10 border-[3px] border-primary rounded flex items-center gap-2">
-                    <span className="text-2xl">{selectedInventoryItem}</span>
-                    <span className="font-semibold">
-                      Planting from inventory: {selectedInventoryItem}
-                    </span>
+                {(selectedInventoryItem || selectedVegetable) && isOwnProfile && (
+                  <div className="mb-3 flex items-center gap-3">
                     <Button
-                      onClick={() => setSelectedInventoryItem(null)}
+                      onClick={() => {
+                        setSelectedInventoryItem(null);
+                        setSelectedVegetable(null);
+                      }}
                       size="sm"
                       variant="outline"
-                      className="ml-auto border-[2px] border-foreground"
+                      className="border-[3px] border-foreground"
                     >
+                      <XIcon className="w-4 h-4 mr-2" />
                       Cancel
                     </Button>
-                  </div>
-                )}
-                {selectedVegetable && isOwnProfile && (
-                  <div className="mb-3 p-3 bg-primary/10 border-[3px] border-primary rounded flex items-center gap-2">
-                    <span className="text-2xl">{selectedVegetable}</span>
-                    <span className="font-semibold">
-                      Selected: {allVegetables.find(v => v.emoji === selectedVegetable)?.name}
-                    </span>
-                    <span className="text-sm text-muted-foreground">
-                      Click an empty cell to plant
-                    </span>
-                    <Button
-                      onClick={() => setSelectedVegetable(null)}
-                      size="sm"
-                      variant="outline"
-                      className="ml-auto border-[2px] border-foreground"
-                    >
-                      Cancel
-                    </Button>
+                    {selectedInventoryItem && (
+                      <div className="p-3 bg-primary/10 border-[3px] border-primary rounded flex items-center gap-2">
+                        <span className="font-semibold">
+                          Planting from inventory: {selectedInventoryItem}
+                        </span>
+                        <span className="text-sm text-muted-foreground">
+                          Click an empty cell to plant
+                        </span>
+                      </div>
+                    )}
+                    {selectedVegetable && (
+                      <div className="p-3 bg-primary/10 border-[3px] border-primary rounded flex items-center gap-2">
+                        <span className="font-semibold">
+                          Selected: {allVegetables.find(v => v.emoji === selectedVegetable)?.name}
+                        </span>
+                        <span className="text-sm text-muted-foreground">
+                          Click an empty cell to plant
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
