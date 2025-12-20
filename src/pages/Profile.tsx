@@ -2771,26 +2771,36 @@ const Profile = () => {
                       <XIcon className="w-4 h-4 mr-2" />
                       Cancel
                     </Button>
-                    {selectedInventoryItem && (
-                      <div className="p-3 bg-primary/10 border-[3px] border-primary rounded flex items-center gap-2">
-                        <span className="font-semibold">
-                          Planting from inventory: {selectedInventoryItem}
-                        </span>
-                        <span className="text-sm text-muted-foreground">
-                          Click an empty cell to plant
-                        </span>
-                      </div>
-                    )}
-                    {selectedVegetable && (
-                      <div className="p-3 bg-primary/10 border-[3px] border-primary rounded flex items-center gap-2">
-                        <span className="font-semibold">
-                          Selected: {allVegetables.find(v => v.emoji === selectedVegetable)?.name}
-                        </span>
-                        <span className="text-sm text-muted-foreground">
-                          Click an empty cell to plant
-                        </span>
-                      </div>
-                    )}
+                    {selectedInventoryItem && (() => {
+                      const shopItem = allVegetables.find(v => v.emoji === selectedInventoryItem);
+                      const growthTime = shopItem ? getGrowthTime(shopItem.cost) : 0;
+                      const growthMinutes = Math.round(growthTime / (60 * 1000));
+                      return (
+                        <div className="p-3 bg-primary/10 border-[3px] border-primary rounded flex items-center gap-2">
+                          <span className="font-semibold">
+                            Planting from inventory: {selectedInventoryItem}
+                          </span>
+                          <span className="text-sm text-muted-foreground">
+                            Click an empty cell to plant • Grows in {growthMinutes} minute{growthMinutes !== 1 ? 's' : ''}
+                          </span>
+                        </div>
+                      );
+                    })()}
+                    {selectedVegetable && (() => {
+                      const shopItem = allVegetables.find(v => v.emoji === selectedVegetable);
+                      const growthTime = shopItem ? getGrowthTime(shopItem.cost) : 0;
+                      const growthMinutes = Math.round(growthTime / (60 * 1000));
+                      return (
+                        <div className="p-3 bg-primary/10 border-[3px] border-primary rounded flex items-center gap-2">
+                          <span className="font-semibold">
+                            Selected: {allVegetables.find(v => v.emoji === selectedVegetable)?.name}
+                          </span>
+                          <span className="text-sm text-muted-foreground">
+                            Click an empty cell to plant • Grows in {growthMinutes} minute{growthMinutes !== 1 ? 's' : ''}
+                          </span>
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
               </div>
