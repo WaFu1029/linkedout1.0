@@ -291,19 +291,14 @@ const Explosion = ({ show, text, onComplete }: { show: boolean; text?: string; o
 
 const chartData = [
   { 
-    category: "Feel lonely/isolated", 
-    percentage: 40,
-    description: "Self-reported negative impact in survey synthesis"
+    category: "Social media burnout", 
+    percentage: 33,
+    description: " of users self-report social media exhaustion or burnout"
   },
   { 
-    category: "Social media fatigue", 
-    percentage: 32,
-    description: "Burnout/stress from social media use"
-  },
-  { 
-    category: "Feel inadequate", 
-    percentage: 40,
-    description: "Negative social comparison response"
+    category: "Self-image", 
+    percentage: 25,
+    description: " of users feel worse about their own life or self-image"
   },
 ];
 
@@ -342,6 +337,7 @@ const Index = () => {
   const [showExplosion, setShowExplosion] = useState(false);
   const [showNewText, setShowNewText] = useState(false);
   const [hasTypedFirstText, setHasTypedFirstText] = useState(false);
+  const [showRestOfPage, setShowRestOfPage] = useState(false);
   const [barChartVisible, setBarChartVisible] = useState(false);
   const [lineChartVisible, setLineChartVisible] = useState(false);
   const [statVisible, setStatVisible] = useState(false);
@@ -452,12 +448,16 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background index-page-scroll">
-      <Navbar />
+      {/* Navbar - fades in after explosion */}
+      <div className={`transition-opacity duration-1000 ${showRestOfPage ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+        <Navbar />
+      </div>
 
-      {/* Hero Section */}
-      <section className={`min-h-[calc(100vh-64px)] flex items-center justify-center pt-48 pb-48 md:pt-56 md:pb-64 ${showExplosion ? 'animate-screen-shake' : ''}`}>        <div className="container mx-auto px-4">
+      {/* Hero Section - Fixed initially, becomes relative after explosion */}
+      <section className={`${showRestOfPage ? 'relative' : 'fixed inset-0'} flex items-center justify-center ${showRestOfPage ? 'z-0' : 'z-50'} bg-background transition-all duration-1000 ${showExplosion ? 'animate-screen-shake' : ''} ${showRestOfPage ? 'pt-48 pb-48 md:pt-56 md:pb-64 min-h-[calc(100vh-64px)]' : ''}`}>
+        <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto text-center relative">
-            <div className="inline-block bg-foreground text-background px-4 py-2 mb-6 border-[3px] border-foreground font-mono text-sm">
+            <div className={`inline-block bg-foreground text-background px-4 py-2 mb-6 border-[3px] border-foreground font-mono text-sm transition-opacity duration-1000 ${showRestOfPage ? 'opacity-100' : 'opacity-0'}`}>
               BASICALLY EVIL LINKEDIN
             </div>
             <h1 className="text-5xl md:text-7xl font-bold mb-6 leading-tight relative">
@@ -477,7 +477,10 @@ const Index = () => {
       <Explosion 
         show={showExplosion}
         text={"I am excited to\nannounce..."}
-        onComplete={() => setShowNewText(true)}
+        onComplete={() => {
+          setShowNewText(true);
+          setShowRestOfPage(true);
+        }}
       />
     )}
   </span>
@@ -496,10 +499,10 @@ const Index = () => {
                 </span>
               )}
             </h1>
-            <p className="text-xl md:text-2xl text-muted-foreground mb-10 max-w-2xl mx-auto animate-fade-in-up animation-delay-200">
+            <p className={`text-xl md:text-2xl text-muted-foreground mb-10 max-w-2xl mx-auto transition-opacity duration-1000 delay-300 ${showRestOfPage ? 'opacity-100' : 'opacity-0'}`}>
               A social network where we celebrate vulnerability, relate to rejection, and don't pretend to have it all figured out.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in-up animation-delay-300">
+            <div className={`flex flex-col sm:flex-row gap-4 justify-center transition-opacity duration-1000 delay-500 ${showRestOfPage ? 'opacity-100' : 'opacity-0'}`}>
               <Button size="xl" asChild>
                 <Link to="/auth?mode=signup">
                   Start Failing, Together <ArrowRight className="ml-2" />
@@ -515,8 +518,11 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Why Section */}
-      <section className={whySectionClassName}>
+      {/* Rest of the page - fades in after explosion */}
+      <div className={`transition-opacity duration-1000 ${showRestOfPage ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+
+        {/* Why Section */}
+        <section className={whySectionClassName}>
         <div className="container mx-auto px-4">
           <div className="max-w-3xl text-left pl-4 md:pl-8 mb-8">
             <h2 className="text-3xl md:text-4xl font-bold text-background">
@@ -526,197 +532,242 @@ const Index = () => {
           </div>
             <div className="pl-4 md:pl-8 pr-4 md:pr-8">
               <div className="flex flex-col md:flex-row gap-4 md:items-stretch">
-              <div ref={barChartRef} className={barChartContainerClassName}>
-  <h3 className="text-lg md:text-xl font-bold mb-2 text-background flex-shrink-0">
-    Social Media Users Report Feelings of Loneliness and Inadequacy
-  </h3>
-  <ChartContainer 
-    config={chartConfig} 
-    className={barChartClassName}
-  >
-  <BarChart
-                  data={chartData}
-                  margin={{
-                    left: 0,
-                    right: 8,
-                    top: 30,
-                    bottom: 10,
-                  }}
-                >
-                  <CartesianGrid vertical={false} stroke={isDark ? "hsla(270, 30%, 92%, 0.3)" : "rgba(255, 255, 255, 0.3)"} />
-                  <XAxis
-                    dataKey="category"
-                    tickLine={false}
-                    axisLine={false}
-                    tickMargin={8}
-                    tick={{ fill: isDark ? "hsl(270, 30%, 92%)" : "#ffffff", fontSize: 12 }}
-                    height={60}
-                    interval={0}
-                  />
-                  <YAxis
-                    tickLine={false}
-                    axisLine={false}
-                    tickMargin={4}
-                    tick={{ fill: isDark ? "hsl(270, 30%, 92%)" : "#ffffff", fontSize: 11 }}
-                    domain={[0, 50]}
-                    label={{ 
-                      value: "Percentage of Users", 
-                      angle: -90, 
-                      position: "insideLeft", 
-                      fill: isDark ? "hsl(270, 30%, 92%)" : "#ffffff",
-                      style: { textAnchor: "middle", fontSize: "11px" }
-                    }}
-                    width={60}
-                  />
-                  <ChartTooltip
-                    cursor={false}
-                    content={<ChartTooltipContent 
-                      indicator="dot"
-                      formatter={(value, name, props) => [
-                        value + '%',
-                        props.payload.description
-                      ]}
-                    />}
-                  />
-                  <Bar
-                    dataKey="percentage"
-                    fill={isDark ? "hsl(270, 30%, 92%)" : "#ffffff"}
-                    radius={[4, 4, 0, 0]}
-                    isAnimationActive={barChartVisible}
-                    animationBegin={0}
-                    animationDuration={1000}
-                    label={{ 
-                      position: "center", 
-                      fill: isDark ? "hsl(270, 60%, 65%)" : "#f97316", 
-                      fontSize: 20, 
-                      fontWeight: "bold",
-                      formatter: (value: number) => value + '%'
-                    }}
-                  />
-                </BarChart>
-              </ChartContainer>
-                </div>
-                
-                {/* Stats Square */}
-                <div ref={statRef} className={statSquareClassName}>
-                <div className={statValueClassName}>
-                    {statValue}%
+                {/* Bar Chart Container */}
+                <div className="flex flex-col">
+                  <div ref={barChartRef} className={barChartContainerClassName}>
+                    <h3 className="text-lg md:text-xl font-bold mb-2 text-background flex-shrink-0">
+                      Social Media Users Report Negative Mental Health Effects
+                    </h3>
+                    <ChartContainer 
+                      config={chartConfig} 
+                      className={barChartClassName}
+                    >
+                      <BarChart
+                        data={chartData}
+                        margin={{
+                          left: 0,
+                          right: 8,
+                          top: 30,
+                          bottom: 10,
+                        }}
+                      >
+                        <CartesianGrid vertical={false} stroke={isDark ? "hsla(270, 30%, 92%, 0.3)" : "rgba(255, 255, 255, 0.3)"} />
+                        <XAxis
+                          dataKey="category"
+                          tickLine={false}
+                          axisLine={false}
+                          tickMargin={8}
+                          tick={{ fill: isDark ? "hsl(270, 30%, 92%)" : "#ffffff", fontSize: 12 }}
+                          height={60}
+                          interval={0}
+                        />
+                        <YAxis
+                          tickLine={false}
+                          axisLine={false}
+                          tickMargin={4}
+                          tick={{ fill: isDark ? "hsl(270, 30%, 92%)" : "#ffffff", fontSize: 11 }}
+                          domain={[0, 50]}
+                          label={{ 
+                            value: "Percentage of Users", 
+                            angle: -90, 
+                            position: "insideLeft", 
+                            fill: isDark ? "hsl(270, 30%, 92%)" : "#ffffff",
+                            style: { textAnchor: "middle", fontSize: "11px" }
+                          }}
+                          width={60}
+                        />
+                        <ChartTooltip
+                          cursor={false}
+                          content={<ChartTooltipContent 
+                            indicator="dot"
+                            formatter={(value, name, props) => [
+                              value + '%',
+                              props.payload.description
+                            ]}
+                          />}
+                        />
+                        <Bar
+                          dataKey="percentage"
+                          fill={isDark ? "hsl(270, 30%, 92%)" : "#ffffff"}
+                          radius={[4, 4, 0, 0]}
+                          isAnimationActive={barChartVisible}
+                          animationBegin={0}
+                          animationDuration={1000}
+                          label={{ 
+                            position: "center", 
+                            fill: isDark ? "hsl(270, 60%, 65%)" : "#f97316", 
+                            fontSize: 20, 
+                            fontWeight: "bold",
+                            formatter: (value: number) => value + '%'
+                          }}
+                        />
+                      </BarChart>
+                    </ChartContainer>
                   </div>
-                  <p className="text-sm md:text-base text-foreground text-center leading-relaxed">
-                    Of studies on social media from 2010–2022 report a significant negative association with mental health.
-                  </p>
+                  <div className="flex justify-center mt-4">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className="border-background/30 shadow-none hover:translate-x-0 hover:translate-y-0 hover:shadow-none"
+                      style={{ backgroundColor: 'transparent', color: '#ffffff' }}
+                      asChild
+                    >
+                      <a href="https://health.ucdavis.edu/blog/cultivating-health/social-medias-impact-our-mental-health-and-tips-to-use-it-safely/2024/05" target="_blank" rel="noopener noreferrer" className="text-white hover:text-background/70 transition-colors">
+                        Source
+                      </a>
+                    </Button>
+                  </div>
                 </div>
                 
-                {/* Correlation Line Graph */}
-                {/* Correlation Line Graph */}
-                <div ref={lineChartRef} className={lineChartContainerClassName}>
-  <div className="flex-shrink-0">
-    <h3 className="text-lg md:text-xl font-bold mb-1 text-background">
-      Social Media Use Correlates with Social Comparison and Appearance Anxiety
-    </h3>
-    <p className="text-xs text-background/90 leading-tight">
-    </p>
-  </div>
-  <div className="relative flex-1 w-full min-h-0 h-full">
-    <ChartContainer 
-      config={correlationConfig} 
-      className={lineChartClassName + ' relative h-full'}
-      style={{ aspectRatio: 'auto' }}
-    >
-  <LineChart
-  data={correlationData}
-  margin={{
-    left: 12,
-    right: 12,
-    top: 12,
-    bottom: 0,
-  }}
-  style={{ overflow: 'visible' }}
->
-<CartesianGrid stroke={isDark ? "hsla(270, 30%, 92%, 0.3)" : "rgba(255, 255, 255, 0.3)"} strokeWidth={1} horizontalCoordinatesGenerator={(props) => [0, 1, 2, 3, 4, 5, 6].map(i => props.offset.top + (i * (props.height - props.offset.top) / 6))} verticalCoordinatesGenerator={(props) => [0, 1, 2, 3, 4, 5, 6].map(i => props.offset.left + (i * (props.width - props.offset.left - props.offset.right) / 6))} />
-<XAxis
-        dataKey="usc"
-        tickLine={false}
-        axisLine={false}
-        tick={false}
-        height={1}
-        domain={[1, 7]}
-        type="number"
-      />
-      <YAxis
-        tickLine={false}
-        axisLine={false}
-        tick={{ fontSize: 0 }}
-        width={1}
-        domain={[2, 7]}
-        tickCount={6}
-      />
-      <ChartTooltip
-        cursor={false}
-        content={<ChartTooltipContent 
-          indicator="dot"
-          formatter={() => ["Correlation: r=0.546, p<0.01", ""]}
-        />}
-      />
-      <Line
-        type="linear"
-        dataKey="anxiety"
-        stroke="transparent"
-        strokeWidth={0}
-        dot={false}
-        activeDot={false}
-        isAnimationActive={lineChartVisible}
-        animationBegin={0}
-        animationDuration={1000}
-      />
-    </LineChart>
-    {/* Arrow overlay - positioned to match chart plot area */}
-    <div 
-      className="absolute pointer-events-none overflow-hidden z-10"
-      style={{
-        left: '12px',
-        right: '12px',
-        top: '12px',
-        bottom: '0',
-      }}
-    >
-      {/* Full arrow with body and head - starts at bottom-left corner, stops before top-right */}
-      <div 
-        className={'absolute pointer-events-none transition-opacity duration-1000 ' + (lineChartVisible ? 'opacity-100' : 'opacity-0')}
-        style={{
-          left: '0',
-          bottom: '0',
-          width: '95%',
-          height: '18px',
-          transform: lineChartVisible ? 'rotate(-38deg)' : 'rotate(-38deg) scaleX(0)',
-          transformOrigin: '0 100%',
-          transition: 'transform 1s ease-out',
-          display: 'flex',
-          alignItems: 'center',
-        }}
-      >
-        {/* Arrow body */}
-        <div 
-          className={arrowBodyClassName}
-          style={{
-            width: 'calc(100% - 35px)',
-            height: '18px',
-            flexShrink: 0,
-          }}
-        />
-        {/* Arrow head */}
-        <div 
-          className={arrowHeadClassName}
-          style={{
-            flexShrink: 0,
-          }}
-        />
-      </div>
-    </div>
-  </ChartContainer>
-  </div>
-</div>
-            </div>
+                {/* Stats Square Container */}
+                <div className="flex flex-col">
+                  <div ref={statRef} className={statSquareClassName}>
+                    <div className={statValueClassName}>
+                      {statValue}%
+                    </div>
+                    <p className="text-sm md:text-base text-foreground text-center leading-relaxed">
+                      Of studies on social media from 2010–2022 report a significant negative association with mental health.
+                    </p>
+                  </div>
+                  <div className="flex justify-center mt-4">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className="border-background/30 shadow-none hover:translate-x-0 hover:translate-y-0 hover:shadow-none"
+                      style={{ backgroundColor: 'transparent', color: '#ffffff' }}
+                      asChild
+                    >
+                      <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC9620890/" target="_blank" rel="noopener noreferrer" className="text-white hover:text-background/70 transition-colors">
+                        Source
+                      </a>
+                    </Button>
+                  </div>
+                </div>
+                
+                {/* Correlation Line Graph Container */}
+                <div className="flex flex-col">
+                  <div ref={lineChartRef} className={lineChartContainerClassName}>
+                    <div className="flex-shrink-0">
+                      <h3 className="text-lg md:text-xl font-bold mb-1 text-background">
+                        Social Media Use Correlates with Social Comparison and Appearance Anxiety
+                      </h3>
+                      <p className="text-xs text-background/90 leading-tight">
+                      </p>
+                    </div>
+                    <div className="relative flex-1 w-full min-h-0 h-full">
+                      <ChartContainer 
+                        config={correlationConfig} 
+                        className={lineChartClassName + ' relative h-full'}
+                        style={{ aspectRatio: 'auto' }}
+                      >
+                        <LineChart
+                          data={correlationData}
+                          margin={{
+                            left: 12,
+                            right: 12,
+                            top: 12,
+                            bottom: 0,
+                          }}
+                          style={{ overflow: 'visible' }}
+                        >
+                          <CartesianGrid stroke={isDark ? "hsla(270, 30%, 92%, 0.3)" : "rgba(255, 255, 255, 0.3)"} strokeWidth={1} horizontalCoordinatesGenerator={(props) => [0, 1, 2, 3, 4, 5, 6].map(i => props.offset.top + (i * (props.height - props.offset.top) / 6))} verticalCoordinatesGenerator={(props) => [0, 1, 2, 3, 4, 5, 6].map(i => props.offset.left + (i * (props.width - props.offset.left - props.offset.right) / 6))} />
+                          <XAxis
+                            dataKey="usc"
+                            tickLine={false}
+                            axisLine={false}
+                            tick={false}
+                            height={1}
+                            domain={[1, 7]}
+                            type="number"
+                          />
+                          <YAxis
+                            tickLine={false}
+                            axisLine={false}
+                            tick={{ fontSize: 0 }}
+                            width={1}
+                            domain={[2, 7]}
+                            tickCount={6}
+                          />
+                          <ChartTooltip
+                            cursor={false}
+                            content={<ChartTooltipContent 
+                              indicator="dot"
+                              formatter={() => ["Correlation: r=0.546, p<0.01", ""]}
+                            />}
+                          />
+                          <Line
+                            type="linear"
+                            dataKey="anxiety"
+                            stroke="transparent"
+                            strokeWidth={0}
+                            dot={false}
+                            activeDot={false}
+                            isAnimationActive={lineChartVisible}
+                            animationBegin={0}
+                            animationDuration={1000}
+                          />
+                        </LineChart>
+                        {/* Arrow overlay - positioned to match chart plot area */}
+                        <div 
+                          className="absolute pointer-events-none overflow-hidden z-10"
+                          style={{
+                            left: '12px',
+                            right: '12px',
+                            top: '12px',
+                            bottom: '0',
+                          }}
+                        >
+                          {/* Full arrow with body and head - starts at bottom-left corner, stops before top-right */}
+                          <div 
+                            className={'absolute pointer-events-none transition-opacity duration-1000 ' + (lineChartVisible ? 'opacity-100' : 'opacity-0')}
+                            style={{
+                              left: '0',
+                              bottom: '0',
+                              width: '95%',
+                              height: '18px',
+                              transform: lineChartVisible ? 'rotate(-38deg)' : 'rotate(-38deg) scaleX(0)',
+                              transformOrigin: '0 100%',
+                              transition: 'transform 1s ease-out',
+                              display: 'flex',
+                              alignItems: 'center',
+                            }}
+                          >
+                            {/* Arrow body */}
+                            <div 
+                              className={arrowBodyClassName}
+                              style={{
+                                width: 'calc(100% - 35px)',
+                                height: '18px',
+                                flexShrink: 0,
+                              }}
+                            />
+                            {/* Arrow head */}
+                            <div 
+                              className={arrowHeadClassName}
+                              style={{
+                                flexShrink: 0,
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </ChartContainer>
+                    </div>
+                  </div>
+                  <div className="flex justify-center mt-4">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className="border-background/30 shadow-none hover:translate-x-0 hover:translate-y-0 hover:shadow-none"
+                      style={{ backgroundColor: 'transparent', color: '#ffffff' }}
+                      asChild
+                    >
+                      <a href="https://www.mdpi.com/2076-328X/15/1/8" target="_blank" rel="noopener noreferrer" className="text-white hover:text-background/70 transition-colors">
+                        Source
+                      </a>
+                    </Button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
       </section>
@@ -802,9 +853,10 @@ const Index = () => {
             </Button>
           </div>
         </div>
-      </section>
+        </section>
 
-      <Footer />
+        <Footer />
+      </div>
     </div>
   );
 };
