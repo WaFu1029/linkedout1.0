@@ -166,7 +166,7 @@ const Profile = () => {
   const [connectionRequests, setConnectionRequests] = useState<Array<{id: string, user_id: string, full_name: string | null, email: string | null, industry: string | null, created_at: string}>>([]);
   const [commentNotifications, setCommentNotifications] = useState<Array<{id: string, post_id: string, author_id: string, author_name: string | null, author_email: string | null, content: string, created_at: string, post_title: string | null}>>([]);
   const [reactionNotifications, setReactionNotifications] = useState<Array<{id: string, post_id: string, user_id: string, user_name: string | null, user_email: string | null, reaction_type: string, created_at: string, post_title: string | null}>>([]);
-  const [giftNotifications, setGiftNotifications] = useState<Array<{gifter_id: string, gifter_name: string | null, gifter_email: string | null, emoji: string, quantity: number, created_at: string}>>([]);
+  const [giftNotifications, setGiftNotifications] = useState<Array<{id: string, gifter_id: string, gifter_name: string | null, gifter_email: string | null, emoji: string, quantity: number, created_at: string}>>([]);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   
   // Emoji garden grid state - supports both old format (string) and new format (object)
@@ -433,6 +433,27 @@ const Profile = () => {
         emoji: item.emoji,
         count: item.count
       }));
+
+      // Create one gift record per transaction (with the actual quantity)
+      // This way, if you gift 2x in one transaction, it shows as "2x" in one notification
+      // But separate transactions will show as separate notifications
+      const { error: giftsInsertError } = await supabase
+        .from("gifts")
+        .insert({
+          gifter_id: user.id,
+          recipient_id: friendId,
+          emoji: emoji,
+          quantity: quantity, // Store the actual quantity for this transaction
+        });
+
+      if (giftsInsertError) {
+        console.error("Error creating gift records:", giftsInsertError);
+        // If table doesn't exist, that's okay - user needs to run migration
+        if (giftsInsertError.code === '42P01' || giftsInsertError.message?.includes('does not exist')) {
+          console.log("Gifts table doesn't exist. Gift will still be added to inventory, but notification won't be created.");
+        }
+        // Don't throw - continue with inventory update even if gift records fail
+      }
 
       // Update recipient's inventory and gifts_received
       const { error: recipientError } = await supabase
@@ -881,6 +902,16 @@ const Profile = () => {
 
       setNotificationsLoading(true);
       try {
+        // Fetch dismissed notifications first
+        const { data: dismissedNotifs } = await supabase
+          .from("dismissed_notifications")
+          .select("notification_type, notification_id")
+          .eq("user_id", user.id);
+
+        const dismissedSet = new Set(
+          dismissedNotifs?.map(d => `${d.notification_type}:${d.notification_id}`) || []
+        );
+
         // Fetch incoming connection requests (people who connected to you but you haven't connected back)
         const { data: incomingConnections, error: connError } = await supabase
           .from("connections")
@@ -909,6 +940,7 @@ const Profile = () => {
             const outgoingSet = new Set(outgoingConnections?.map(c => c.connected_user_id) || []);
             const requests = incomingConnections
               .filter(c => !outgoingSet.has(c.user_id))
+              .filter(c => !dismissedSet.has(`connection_request:${c.id}`))
               .map(c => ({
                 id: c.id,
                 user_id: c.user_id,
@@ -991,19 +1023,21 @@ const Profile = () => {
 
             const profileMap = new Map(userProfiles?.map(p => [p.id, p]) || []);
             const postMap = new Map(userPosts.map(p => [p.id, p.title]));
-            const reactionNotifs = reactions.map(r => {
-              const profile = profileMap.get(r.user_id);
-              return {
-                id: r.id,
-                post_id: r.post_id,
-                user_id: r.user_id,
-                user_name: profile?.full_name || null,
-                user_email: profile?.email || null,
-                reaction_type: r.reaction_type,
-                created_at: r.created_at,
-                post_title: postMap.get(r.post_id) || null
-              };
-            });
+            const reactionNotifs = reactions
+              .filter(r => !dismissedSet.has(`reaction:${r.id}`))
+              .map(r => {
+                const profile = profileMap.get(r.user_id);
+                return {
+                  id: r.id,
+                  post_id: r.post_id,
+                  user_id: r.user_id,
+                  user_name: profile?.full_name || null,
+                  user_email: profile?.email || null,
+                  reaction_type: r.reaction_type,
+                  created_at: r.created_at,
+                  post_title: postMap.get(r.post_id) || null
+                };
+              });
             setReactionNotifications(reactionNotifs);
           } else {
             setReactionNotifications([]);
@@ -1012,20 +1046,59 @@ const Profile = () => {
           setReactionNotifications([]);
         }
 
-        // Fetch gift notifications - check if gifts_received > 0
-        // Note: In a production app, you'd want a separate gifts table with gifter info and timestamps
-        // For now, we'll show a notification if gifts_received count is > 0
-        if (profile?.gifts_received && profile.gifts_received > 0) {
-          // Since we don't have individual gift records, show a summary notification
-          setGiftNotifications([{
-            gifter_id: '',
-            gifter_name: null,
-            gifter_email: null,
-            emoji: '🎁',
-            quantity: profile.gifts_received,
-            created_at: new Date().toISOString()
-          }]);
-        } else {
+        // Fetch gift notifications from gifts table
+        try {
+          const { data: gifts, error: giftsError } = await supabase
+            .from("gifts")
+            .select("id, gifter_id, emoji, quantity, created_at")
+            .eq("recipient_id", user.id)
+            .order("created_at", { ascending: false })
+            .limit(50);
+
+          if (giftsError) {
+            // If table doesn't exist, that's okay - just log and continue
+            if (giftsError.code === '42P01' || giftsError.message?.includes('does not exist')) {
+              console.log("Gifts table doesn't exist yet. Run migration 20240101000010_create_gifts_table.sql");
+              setGiftNotifications([]);
+            } else {
+              console.error("Error fetching gifts:", giftsError);
+              setGiftNotifications([]);
+            }
+          } else if (gifts && gifts.length > 0) {
+            // Filter out dismissed gifts
+            const undismissedGifts = gifts.filter(g => !dismissedSet.has(`gift:${g.id}`));
+            
+            if (undismissedGifts.length > 0) {
+              // Fetch gifter profiles separately
+              const gifterIds = [...new Set(undismissedGifts.map(g => g.gifter_id))];
+              const { data: gifterProfiles } = await supabase
+                .from("profiles")
+                .select("id, full_name, email")
+                .in("id", gifterIds);
+
+              const profileMap = new Map(gifterProfiles?.map(p => [p.id, p]) || []);
+              
+              // Create individual notifications for each gift (not aggregated)
+              const giftNotifs = undismissedGifts.map(gift => {
+                const gifterProfile = profileMap.get(gift.gifter_id);
+                return {
+                  gifter_id: gift.gifter_id,
+                  gifter_name: gifterProfile?.full_name || null,
+                  gifter_email: gifterProfile?.email || null,
+                  emoji: gift.emoji,
+                  quantity: gift.quantity,
+                  created_at: gift.created_at
+                };
+              });
+              setGiftNotifications(giftNotifs);
+            } else {
+              setGiftNotifications([]);
+            }
+          } else {
+            setGiftNotifications([]);
+          }
+        } catch (giftError) {
+          console.error("Error in gift notifications fetch:", giftError);
           setGiftNotifications([]);
         }
       } catch (error) {
@@ -1036,7 +1109,7 @@ const Profile = () => {
     };
 
     fetchNotifications();
-  }, [isOwnProfile, user?.id, profile?.gifts_received]);
+  }, [isOwnProfile, user?.id]);
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -1560,6 +1633,81 @@ const Profile = () => {
     }
   };
 
+  const handleClearAllNotifications = async () => {
+    if (!user) return;
+
+    try {
+      const dismissRecords: Array<{user_id: string, notification_type: string, notification_id: string}> = [];
+
+      // Mark connection requests as dismissed
+      if (connectionRequests.length > 0) {
+        connectionRequests.forEach(req => {
+          dismissRecords.push({
+            user_id: user.id,
+            notification_type: 'connection_request',
+            notification_id: req.id
+          });
+        });
+      }
+
+      // Mark comments as dismissed
+      if (commentNotifications.length > 0) {
+        commentNotifications.forEach(comment => {
+          dismissRecords.push({
+            user_id: user.id,
+            notification_type: 'comment',
+            notification_id: comment.id
+          });
+        });
+      }
+
+      // Mark reactions as dismissed
+      if (reactionNotifications.length > 0) {
+        reactionNotifications.forEach(reaction => {
+          dismissRecords.push({
+            user_id: user.id,
+            notification_type: 'reaction',
+            notification_id: reaction.id
+          });
+        });
+      }
+
+      // Mark gifts as dismissed
+      if (giftNotifications.length > 0) {
+        giftNotifications.forEach(gift => {
+          dismissRecords.push({
+            user_id: user.id,
+            notification_type: 'gift',
+            notification_id: gift.id
+          });
+        });
+      }
+
+      // Insert all dismiss records
+      if (dismissRecords.length > 0) {
+        const { error: dismissError } = await supabase
+          .from("dismissed_notifications")
+          .insert(dismissRecords);
+
+        if (dismissError) {
+          console.error("Error dismissing notifications:", dismissError);
+          // Continue anyway to clear from UI
+        }
+      }
+
+      // Clear from local state
+      setConnectionRequests([]);
+      setCommentNotifications([]);
+      setReactionNotifications([]);
+      setGiftNotifications([]);
+      
+      toast.success("All notifications cleared");
+    } catch (error) {
+      console.error("Error clearing notifications:", error);
+      toast.error("Failed to clear some notifications");
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
@@ -1890,9 +2038,21 @@ const Profile = () => {
             {/* Notifications Section - Only show on own profile */}
             {isOwnProfile && (
               <Card className="border-[3px] border-foreground shadow-brutal p-6 md:p-8 mb-8">
-                <div className="flex items-center gap-2 mb-4">
-                  <Bell className="w-5 h-5" />
-                  <h2 className="font-bold text-2xl">Notifications</h2>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <Bell className="w-5 h-5" />
+                    <h2 className="font-bold text-2xl">Notifications</h2>
+                  </div>
+                  {(connectionRequests.length > 0 || commentNotifications.length > 0 || reactionNotifications.length > 0 || giftNotifications.length > 0) && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleClearAllNotifications}
+                      className="border-[2px] border-foreground"
+                    >
+                      Clear All
+                    </Button>
+                  )}
                 </div>
                 
                 {notificationsLoading ? (
@@ -2013,17 +2173,19 @@ const Profile = () => {
                               </div>
                             </div>
                           ))}
-                          {giftNotifications.map((gift, index) => (
-                            <div key={index} className="p-4 border-[2px] border-foreground rounded-md bg-secondary">
+                          {giftNotifications.map((gift) => (
+                            <div key={gift.id} className="p-4 border-[2px] border-foreground rounded-md bg-secondary">
                               <div className="flex items-start gap-3">
                                 <Gift className="w-4 h-4 text-primary mt-1" />
                                 <div className="flex-1">
                                   <p className="text-sm">
-                                    {gift.gifter_name || gift.gifter_email?.split("@")[0] || "Someone"} 
+                                    <span className="font-semibold">
+                                      {gift.gifter_name || gift.gifter_email?.split("@")[0] || "Someone"}
+                                    </span>
                                     {" "}gifted you {gift.quantity}x {gift.emoji}
                                   </p>
                                   <p className="text-xs text-muted-foreground mt-1">
-                                    Check your garden to see the gifts!
+                                    {formatDistanceToNow(new Date(gift.created_at), { addSuffix: true })}
                                   </p>
                                 </div>
                               </div>
@@ -2154,17 +2316,19 @@ const Profile = () => {
                           <p>No gifts received yet</p>
                         </div>
                       ) : (
-                        giftNotifications.map((gift, index) => (
-                          <div key={index} className="p-4 border-[2px] border-foreground rounded-md bg-secondary">
+                        giftNotifications.map((gift) => (
+                          <div key={gift.id} className="p-4 border-[2px] border-foreground rounded-md bg-secondary">
                             <div className="flex items-start gap-3">
                               <Gift className="w-4 h-4 text-primary mt-1" />
                               <div className="flex-1">
                                 <p className="text-sm">
-                                  {gift.gifter_name || gift.gifter_email?.split("@")[0] || "Someone"} 
+                                  <span className="font-semibold">
+                                    {gift.gifter_name || gift.gifter_email?.split("@")[0] || "Someone"}
+                                  </span>
                                   {" "}gifted you {gift.quantity}x {gift.emoji}
                                 </p>
                                 <p className="text-xs text-muted-foreground mt-1">
-                                  Check your garden to see the gifts!
+                                  {formatDistanceToNow(new Date(gift.created_at), { addSuffix: true })}
                                 </p>
                               </div>
                             </div>
