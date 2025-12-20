@@ -2138,23 +2138,23 @@ const Profile = () => {
                   </div>
                 ) : (
                   <Tabs defaultValue="all" className="w-full">
-                    <TabsList className="grid w-full grid-cols-5 border-[3px] border-foreground mb-4">
-                      <TabsTrigger value="all" className="border-r-[3px] border-foreground last:border-r-0">
-                        All ({connectionRequests.length + commentNotifications.length + reactionNotifications.length + giftNotifications.length})
-                      </TabsTrigger>
-                      <TabsTrigger value="connections" className="border-r-[3px] border-foreground last:border-r-0">
-                        Requests ({connectionRequests.length})
-                      </TabsTrigger>
-                      <TabsTrigger value="comments" className="border-r-[3px] border-foreground last:border-r-0">
-                        Comments ({commentNotifications.length})
-                      </TabsTrigger>
-                      <TabsTrigger value="reactions" className="border-r-[3px] border-foreground last:border-r-0">
-                        Reactions ({reactionNotifications.length})
-                      </TabsTrigger>
-                      <TabsTrigger value="gifts">
-                        Gifts ({giftNotifications.length})
-                      </TabsTrigger>
-                    </TabsList>
+                    <TabsList className="flex w-full border-[3px] border-foreground mb-4 p-0 h-auto bg-transparent">
+  <TabsTrigger value="all" className="flex-1 border-r-[3px] border-foreground py-3 px-2 rounded-none data-[state=active]:rounded-none">
+    All ({connectionRequests.length + commentNotifications.length + reactionNotifications.length + giftNotifications.length})
+  </TabsTrigger>
+  <TabsTrigger value="connections" className="flex-1 border-r-[3px] border-foreground py-3 px-2 rounded-none data-[state=active]:rounded-none">
+    Requests ({connectionRequests.length})
+  </TabsTrigger>
+  <TabsTrigger value="comments" className="flex-1 border-r-[3px] border-foreground py-3 px-2 rounded-none data-[state=active]:rounded-none">
+    Comments ({commentNotifications.length})
+  </TabsTrigger>
+  <TabsTrigger value="reactions" className="flex-1 border-r-[3px] border-foreground py-3 px-2 rounded-none data-[state=active]:rounded-none">
+    Reactions ({reactionNotifications.length})
+  </TabsTrigger>
+  <TabsTrigger value="gifts" className="flex-1 py-3 px-2 rounded-none data-[state=active]:rounded-none">
+    Gifts ({giftNotifications.length})
+  </TabsTrigger>
+</TabsList>
 
                     <TabsContent value="all" className="space-y-3">
                       {connectionRequests.length === 0 && commentNotifications.length === 0 && reactionNotifications.length === 0 && giftNotifications.length === 0 ? (
