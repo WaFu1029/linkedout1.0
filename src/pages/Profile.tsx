@@ -29,7 +29,10 @@ import {
   X as XIcon,
   Gift,
   Package,
-  Flame
+  Flame,
+  Bell,
+  MessageSquare,
+  ThumbsUp
 } from "lucide-react";
 import { FailurePost } from "@/components/FailurePost";
 import {
@@ -155,8 +158,15 @@ const Profile = () => {
   const [saving, setSaving] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [isPending, setIsPending] = useState(false);
+  const [hasIncomingRequest, setHasIncomingRequest] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectionsCount, setConnectionsCount] = useState(0);
+  
+  // Notifications state
+  const [connectionRequests, setConnectionRequests] = useState<Array<{id: string, user_id: string, full_name: string | null, email: string | null, industry: string | null, created_at: string}>>([]);
+  const [commentNotifications, setCommentNotifications] = useState<Array<{id: string, post_id: string, author_id: string, author_name: string | null, author_email: string | null, content: string, created_at: string, post_title: string | null}>>([]);
+  const [reactionNotifications, setReactionNotifications] = useState<Array<{id: string, post_id: string, user_id: string, user_name: string | null, user_email: string | null, reaction_type: string, created_at: string, post_title: string | null}>>([]);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
   
   // Emoji garden grid state - supports both old format (string) and new format (object)
   const [gardenGrid, setGardenGrid] = useState<(GardenCell | string | null)[][]>(() => {
@@ -371,7 +381,10 @@ const Profile = () => {
         .eq("id", friendId)
         .single();
 
-      if (fetchError) throw fetchError;
+      if (fetchError) {
+        console.error("Error fetching recipient profile:", fetchError);
+        throw fetchError;
+      }
       if (!recipientProfile) {
         toast.error("Friend not found");
         return;
@@ -461,9 +474,10 @@ const Profile = () => {
 
       const friendName = mutualConnections.find(c => c.id === friendId)?.name || "friend";
       toast.success(`Gifted ${quantity}x ${emoji} to ${friendName}!`);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error gifting from inventory:", error);
-      toast.error("Failed to send gift. Please try again.");
+      const errorMessage = error?.message || "Failed to send gift. Please try again.";
+      toast.error(errorMessage);
     }
   };
 
@@ -736,10 +750,13 @@ const Profile = () => {
         setIsConnected(!!userToProfile && !!profileToUser);
         // Pending if user sent connection but profile hasn't connected back
         setIsPending(!!userToProfile && !profileToUser);
+        // Has incoming request if profile sent connection but user hasn't connected back
+        setHasIncomingRequest(!!profileToUser && !userToProfile);
       } catch (error) {
         console.error("Error checking connection status:", error);
         setIsConnected(false);
         setIsPending(false);
+        setHasIncomingRequest(false);
       }
     };
 
@@ -853,6 +870,158 @@ const Profile = () => {
       fetchMutualConnections();
     }
   }, [isOwnProfile, user]);
+
+  // Fetch notifications for own profile
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      if (!isOwnProfile || !user?.id) {
+        setConnectionRequests([]);
+        setCommentNotifications([]);
+        setReactionNotifications([]);
+        return;
+      }
+
+      setNotificationsLoading(true);
+      try {
+        // Fetch incoming connection requests (people who connected to you but you haven't connected back)
+        const { data: incomingConnections, error: connError } = await supabase
+          .from("connections")
+          .select(`
+            id,
+            user_id,
+            created_at,
+            profiles!connections_user_id_fkey (
+              full_name,
+              email,
+              industry
+            )
+          `)
+          .eq("connected_user_id", user.id);
+
+        if (!connError && incomingConnections) {
+          // Check which ones don't have reverse connection
+          const incomingUserIds = incomingConnections.map(c => c.user_id);
+          if (incomingUserIds.length > 0) {
+            const { data: outgoingConnections } = await supabase
+              .from("connections")
+              .select("connected_user_id")
+              .eq("user_id", user.id)
+              .in("connected_user_id", incomingUserIds);
+
+            const outgoingSet = new Set(outgoingConnections?.map(c => c.connected_user_id) || []);
+            const requests = incomingConnections
+              .filter(c => !outgoingSet.has(c.user_id))
+              .map(c => ({
+                id: c.id,
+                user_id: c.user_id,
+                full_name: (c.profiles as any)?.full_name || null,
+                email: (c.profiles as any)?.email || null,
+                industry: (c.profiles as any)?.industry || null,
+                created_at: c.created_at
+              }));
+            setConnectionRequests(requests);
+          } else {
+            setConnectionRequests([]);
+          }
+        }
+
+        // Fetch comments on user's posts
+        const { data: userPosts } = await supabase
+          .from("posts")
+          .select("id, title")
+          .eq("author_id", user.id);
+
+        if (userPosts && userPosts.length > 0) {
+          const postIds = userPosts.map(p => p.id);
+          const { data: comments, error: commentsError } = await supabase
+            .from("comments")
+            .select("id, post_id, author_id, content, created_at")
+            .in("post_id", postIds)
+            .neq("author_id", user.id) // Exclude own comments
+            .order("created_at", { ascending: false })
+            .limit(20);
+
+          if (!commentsError && comments && comments.length > 0) {
+            // Fetch profile data for comment authors
+            const authorIds = [...new Set(comments.map(c => c.author_id))];
+            const { data: authorProfiles } = await supabase
+              .from("profiles")
+              .select("id, full_name, email")
+              .in("id", authorIds);
+
+            const profileMap = new Map(authorProfiles?.map(p => [p.id, p]) || []);
+            const postMap = new Map(userPosts.map(p => [p.id, p.title]));
+            const commentNotifs = comments.map(c => {
+              const profile = profileMap.get(c.author_id);
+              return {
+                id: c.id,
+                post_id: c.post_id,
+                author_id: c.author_id,
+                author_name: profile?.full_name || null,
+                author_email: profile?.email || null,
+                content: c.content,
+                created_at: c.created_at,
+                post_title: postMap.get(c.post_id) || null
+              };
+            });
+            setCommentNotifications(commentNotifs);
+          } else {
+            setCommentNotifications([]);
+          }
+        } else {
+          setCommentNotifications([]);
+        }
+
+        // Fetch reactions on user's posts
+        if (userPosts && userPosts.length > 0) {
+          const postIds = userPosts.map(p => p.id);
+          const { data: reactions, error: reactionsError } = await supabase
+            .from("reactions")
+            .select("id, post_id, user_id, reaction_type, created_at")
+            .in("post_id", postIds)
+            .neq("user_id", user.id) // Exclude own reactions
+            .order("created_at", { ascending: false })
+            .limit(20);
+
+          if (!reactionsError && reactions && reactions.length > 0) {
+            // Fetch profile data for reaction users
+            const userIds = [...new Set(reactions.map(r => r.user_id))];
+            const { data: userProfiles } = await supabase
+              .from("profiles")
+              .select("id, full_name, email")
+              .in("id", userIds);
+
+            const profileMap = new Map(userProfiles?.map(p => [p.id, p]) || []);
+            const postMap = new Map(userPosts.map(p => [p.id, p.title]));
+            const reactionNotifs = reactions.map(r => {
+              const profile = profileMap.get(r.user_id);
+              return {
+                id: r.id,
+                post_id: r.post_id,
+                user_id: r.user_id,
+                user_name: profile?.full_name || null,
+                user_email: profile?.email || null,
+                reaction_type: r.reaction_type,
+                created_at: r.created_at,
+                post_title: postMap.get(r.post_id) || null
+              };
+            });
+            setReactionNotifications(reactionNotifs);
+          } else {
+            setReactionNotifications([]);
+          }
+        } else {
+          setReactionNotifications([]);
+        }
+      } catch (error) {
+        console.error("Error fetching notifications:", error);
+      } finally {
+        setNotificationsLoading(false);
+      }
+    };
+
+    fetchNotifications();
+  }, [isOwnProfile, user?.id]);
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -1157,6 +1326,7 @@ const Profile = () => {
         if (error) throw error;
         setIsConnected(false);
         setIsPending(false);
+        setHasIncomingRequest(false);
         toast.success("Disconnected");
         // Refresh connections count
         const { data: outgoingConnections } = await supabase
@@ -1198,10 +1368,12 @@ const Profile = () => {
         if (reverseConnection) {
           setIsConnected(true);
           setIsPending(false);
+          setHasIncomingRequest(false);
           toast.success("Connected!");
         } else {
           setIsPending(true);
           setIsConnected(false);
+          setHasIncomingRequest(false);
           toast.success("Connection request sent");
         }
         // Refresh connections count
@@ -1226,6 +1398,148 @@ const Profile = () => {
     } catch (error) {
       console.error("Error connecting/disconnecting:", error);
       toast.error("Failed to update connection status");
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+
+  const handleAcceptRequest = async () => {
+    if (!user || !profileId || isOwnProfile || isConnecting) return;
+
+    setIsConnecting(true);
+    try {
+      // Accept request by creating connection from current user to profile
+      // (profile already has connection to user, so this makes it mutual)
+      const { error } = await supabase
+        .from("connections")
+        .insert({
+          user_id: user.id,
+          connected_user_id: profileId,
+        });
+
+      if (error) throw error;
+      
+      setIsConnected(true);
+      setIsPending(false);
+      setHasIncomingRequest(false);
+      toast.success("Connection accepted!");
+      
+      // Refresh connections count
+      const { data: outgoingConnections } = await supabase
+        .from("connections")
+        .select("connected_user_id")
+        .eq("user_id", profileId);
+      const { data: incomingConnections } = await supabase
+        .from("connections")
+        .select("user_id")
+        .eq("connected_user_id", profileId);
+      if (outgoingConnections && incomingConnections) {
+        const outgoingSet = new Set(outgoingConnections.map(c => c.connected_user_id));
+        const incomingSet = new Set(incomingConnections.map(c => c.user_id));
+        let mutualCount = 0;
+        outgoingSet.forEach(userId => {
+          if (incomingSet.has(userId)) mutualCount++;
+        });
+        setConnectionsCount(mutualCount);
+      }
+    } catch (error) {
+      console.error("Error accepting connection:", error);
+      toast.error("Failed to accept connection");
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+
+  const handleDeclineRequest = async () => {
+    if (!user || !profileId || isOwnProfile || isConnecting) return;
+
+    setIsConnecting(true);
+    try {
+      // Decline request by removing the connection from profile to current user
+      const { error } = await supabase
+        .from("connections")
+        .delete()
+        .eq("user_id", profileId)
+        .eq("connected_user_id", user.id);
+
+      if (error) throw error;
+      
+      setIsConnected(false);
+      setIsPending(false);
+      setHasIncomingRequest(false);
+      toast.success("Connection request declined");
+    } catch (error) {
+      console.error("Error declining connection:", error);
+      toast.error("Failed to decline connection");
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+
+  const handleAcceptRequestFromNotification = async (requestUserId: string) => {
+    if (!user || isConnecting) return;
+
+    setIsConnecting(true);
+    try {
+      // Accept request by creating connection from current user to requester
+      const { error } = await supabase
+        .from("connections")
+        .insert({
+          user_id: user.id,
+          connected_user_id: requestUserId,
+        });
+
+      if (error) throw error;
+      
+      // Remove from notifications
+      setConnectionRequests(prev => prev.filter(r => r.user_id !== requestUserId));
+      toast.success("Connection accepted!");
+      
+      // Refresh connections count
+      const { data: outgoingConnections } = await supabase
+        .from("connections")
+        .select("connected_user_id")
+        .eq("user_id", user.id);
+      const { data: incomingConnections } = await supabase
+        .from("connections")
+        .select("user_id")
+        .eq("connected_user_id", user.id);
+      if (outgoingConnections && incomingConnections) {
+        const outgoingSet = new Set(outgoingConnections.map(c => c.connected_user_id));
+        const incomingSet = new Set(incomingConnections.map(c => c.user_id));
+        let mutualCount = 0;
+        outgoingSet.forEach(userId => {
+          if (incomingSet.has(userId)) mutualCount++;
+        });
+        setConnectionsCount(mutualCount);
+      }
+    } catch (error) {
+      console.error("Error accepting connection:", error);
+      toast.error("Failed to accept connection");
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+
+  const handleDeclineRequestFromNotification = async (requestUserId: string, connectionId: string) => {
+    if (!user || isConnecting) return;
+
+    setIsConnecting(true);
+    try {
+      // Decline request by removing the connection
+      const { error } = await supabase
+        .from("connections")
+        .delete()
+        .eq("id", connectionId);
+
+      if (error) throw error;
+      
+      // Remove from notifications
+      setConnectionRequests(prev => prev.filter(r => r.id !== connectionId));
+      toast.success("Connection request declined");
+    } catch (error) {
+      console.error("Error declining connection:", error);
+      toast.error("Failed to decline connection");
     } finally {
       setIsConnecting(false);
     }
@@ -1362,28 +1676,56 @@ const Profile = () => {
                       )}
                     </>
                   ) : (
-                    <Button
-                      onClick={handleConnect}
-                      disabled={isConnecting}
-                      variant={isConnected ? "outline" : "default"}
-                      className={`border-[3px] border-foreground ${!user ? "opacity-50 cursor-not-allowed" : ""}`}
-                    >
-                      {isConnecting ? (
-                        <Loader2 className="w-4 h-4 animate-spin mr-1" />
-                      ) : isConnected ? (
+                    <div className="flex gap-2">
+                      {hasIncomingRequest ? (
                         <>
-                          <UserMinus className="w-4 h-4 mr-1" /> Disconnect
-                        </>
-                      ) : isPending ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-1" /> Pending
+                          <Button
+                            onClick={handleAcceptRequest}
+                            disabled={isConnecting}
+                            className="border-[3px] border-foreground"
+                          >
+                            {isConnecting ? (
+                              <Loader2 className="w-4 h-4 animate-spin mr-1" />
+                            ) : (
+                              <>
+                                <UserPlus className="w-4 h-4 mr-1" /> Accept Request
+                              </>
+                            )}
+                          </Button>
+                          <Button
+                            onClick={handleDeclineRequest}
+                            disabled={isConnecting}
+                            variant="outline"
+                            className="border-[3px] border-foreground"
+                          >
+                            Decline
+                          </Button>
                         </>
                       ) : (
-                        <>
-                          <UserPlus className="w-4 h-4 mr-1" /> Connect
-                        </>
+                        <Button
+                          onClick={handleConnect}
+                          disabled={isConnecting}
+                          variant={isConnected ? "outline" : "default"}
+                          className={`border-[3px] border-foreground ${!user ? "opacity-50 cursor-not-allowed" : ""}`}
+                        >
+                          {isConnecting ? (
+                            <Loader2 className="w-4 h-4 animate-spin mr-1" />
+                          ) : isConnected ? (
+                            <>
+                              <UserMinus className="w-4 h-4 mr-1" /> Disconnect
+                            </>
+                          ) : isPending ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-1" /> Pending
+                            </>
+                          ) : (
+                            <>
+                              <UserPlus className="w-4 h-4 mr-1" /> Connect
+                            </>
+                          )}
+                        </Button>
                       )}
-                    </Button>
+                    </div>
                   )}
                 </div>
               </div>
@@ -1529,6 +1871,252 @@ const Profile = () => {
                 </div>
               </div>
             </Card>
+
+            {/* Notifications Section - Only show on own profile */}
+            {isOwnProfile && (
+              <Card className="border-[3px] border-foreground shadow-brutal p-6 md:p-8 mb-8">
+                <div className="flex items-center gap-2 mb-4">
+                  <Bell className="w-5 h-5" />
+                  <h2 className="font-bold text-2xl">Notifications</h2>
+                </div>
+                
+                {notificationsLoading ? (
+                  <div className="text-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-primary mx-auto mb-2" />
+                    <p className="text-muted-foreground text-sm">Loading notifications...</p>
+                  </div>
+                ) : (
+                  <Tabs defaultValue="all" className="w-full">
+                    <TabsList className="grid w-full grid-cols-4 border-[3px] border-foreground mb-4">
+                      <TabsTrigger value="all" className="border-r-[3px] border-foreground last:border-r-0">
+                        All ({connectionRequests.length + commentNotifications.length + reactionNotifications.length})
+                      </TabsTrigger>
+                      <TabsTrigger value="connections" className="border-r-[3px] border-foreground last:border-r-0">
+                        Requests ({connectionRequests.length})
+                      </TabsTrigger>
+                      <TabsTrigger value="comments" className="border-r-[3px] border-foreground last:border-r-0">
+                        Comments ({commentNotifications.length})
+                      </TabsTrigger>
+                      <TabsTrigger value="reactions">
+                        Reactions ({reactionNotifications.length})
+                      </TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="all" className="space-y-3">
+                      {connectionRequests.length === 0 && commentNotifications.length === 0 && reactionNotifications.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                          <Bell className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                          <p>No notifications yet</p>
+                        </div>
+                      ) : (
+                        <>
+                          {connectionRequests.map((request) => (
+                            <div key={request.id} className="p-4 border-[2px] border-foreground rounded-md bg-secondary">
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <UserPlus className="w-4 h-4 text-primary" />
+                                    <span className="font-semibold">
+                                      {request.full_name || request.email?.split("@")[0] || "Someone"}
+                                    </span>
+                                    <span className="text-sm text-muted-foreground">wants to connect</span>
+                                  </div>
+                                  {request.industry && (
+                                    <p className="text-xs text-primary font-mono mt-1">
+                                      {request.industry}
+                                    </p>
+                                  )}
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    {formatDistanceToNow(new Date(request.created_at), { addSuffix: true })}
+                                  </p>
+                                </div>
+                                <div className="flex gap-2">
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleAcceptRequestFromNotification(request.user_id)}
+                                    disabled={isConnecting}
+                                    className="border-[2px] border-foreground"
+                                  >
+                                    Accept
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleDeclineRequestFromNotification(request.user_id, request.id)}
+                                    disabled={isConnecting}
+                                    className="border-[2px] border-foreground"
+                                  >
+                                    Decline
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                          {commentNotifications.map((comment) => (
+                            <div key={comment.id} className="p-4 border-[2px] border-foreground rounded-md bg-secondary">
+                              <div className="flex items-start gap-3">
+                                <MessageSquare className="w-4 h-4 text-primary mt-1" />
+                                <div className="flex-1">
+                                  <p className="text-sm">
+                                    <span className="font-semibold">
+                                      {comment.author_name || comment.author_email?.split("@")[0] || "Someone"}
+                                    </span>
+                                    {" "}commented on your post
+                                    {comment.post_title && (
+                                      <span className="text-muted-foreground"> "{comment.post_title}"</span>
+                                    )}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground mt-1 italic">"{comment.content}"</p>
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                          {reactionNotifications.map((reaction) => (
+                            <div key={reaction.id} className="p-4 border-[2px] border-foreground rounded-md bg-secondary">
+                              <div className="flex items-start gap-3">
+                                <ThumbsUp className={`w-4 h-4 mt-1 ${reaction.reaction_type === 'like' ? 'text-primary' : 'text-muted-foreground'}`} />
+                                <div className="flex-1">
+                                  <p className="text-sm">
+                                    <span className="font-semibold">
+                                      {reaction.user_name || reaction.user_email?.split("@")[0] || "Someone"}
+                                    </span>
+                                    {" "}{reaction.reaction_type === 'like' ? 'liked' : 'disliked'} your post
+                                    {reaction.post_title && (
+                                      <span className="text-muted-foreground"> "{reaction.post_title}"</span>
+                                    )}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    {formatDistanceToNow(new Date(reaction.created_at), { addSuffix: true })}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </>
+                      )}
+                    </TabsContent>
+
+                    <TabsContent value="connections" className="space-y-3">
+                      {connectionRequests.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                          <UserPlus className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                          <p>No connection requests</p>
+                        </div>
+                      ) : (
+                        connectionRequests.map((request) => (
+                          <div key={request.id} className="p-4 border-[2px] border-foreground rounded-md bg-secondary">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <UserPlus className="w-4 h-4 text-primary" />
+                                  <span className="font-semibold">
+                                    {request.full_name || request.email?.split("@")[0] || "Someone"}
+                                  </span>
+                                  <span className="text-sm text-muted-foreground">wants to connect</span>
+                                </div>
+                                {request.industry && (
+                                  <p className="text-xs text-primary font-mono mt-1">
+                                    {request.industry}
+                                  </p>
+                                )}
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {formatDistanceToNow(new Date(request.created_at), { addSuffix: true })}
+                                </p>
+                              </div>
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleAcceptRequestFromNotification(request.user_id)}
+                                  disabled={isConnecting}
+                                  className="border-[2px] border-foreground"
+                                >
+                                  Accept
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleDeclineRequestFromNotification(request.user_id, request.id)}
+                                  disabled={isConnecting}
+                                  className="border-[2px] border-foreground"
+                                >
+                                  Decline
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </TabsContent>
+
+                    <TabsContent value="comments" className="space-y-3">
+                      {commentNotifications.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                          <MessageSquare className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                          <p>No comments yet</p>
+                        </div>
+                      ) : (
+                        commentNotifications.map((comment) => (
+                          <div key={comment.id} className="p-4 border-[2px] border-foreground rounded-md bg-secondary">
+                            <div className="flex items-start gap-3">
+                              <MessageSquare className="w-4 h-4 text-primary mt-1" />
+                              <div className="flex-1">
+                                <p className="text-sm">
+                                  <span className="font-semibold">
+                                    {comment.author_name || comment.author_email?.split("@")[0] || "Someone"}
+                                  </span>
+                                  {" "}commented on your post
+                                  {comment.post_title && (
+                                    <span className="text-muted-foreground"> "{comment.post_title}"</span>
+                                  )}
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-1 italic">"{comment.content}"</p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </TabsContent>
+
+                    <TabsContent value="reactions" className="space-y-3">
+                      {reactionNotifications.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                          <ThumbsUp className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                          <p>No reactions yet</p>
+                        </div>
+                      ) : (
+                        reactionNotifications.map((reaction) => (
+                          <div key={reaction.id} className="p-4 border-[2px] border-foreground rounded-md bg-secondary">
+                            <div className="flex items-start gap-3">
+                              <ThumbsUp className={`w-4 h-4 mt-1 ${reaction.reaction_type === 'like' ? 'text-primary' : 'text-muted-foreground'}`} />
+                              <div className="flex-1">
+                                <p className="text-sm">
+                                  <span className="font-semibold">
+                                    {reaction.user_name || reaction.user_email?.split("@")[0] || "Someone"}
+                                  </span>
+                                  {" "}{reaction.reaction_type === 'like' ? 'liked' : 'disliked'} your post
+                                  {reaction.post_title && (
+                                    <span className="text-muted-foreground"> "{reaction.post_title}"</span>
+                                  )}
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {formatDistanceToNow(new Date(reaction.created_at), { addSuffix: true })}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </TabsContent>
+                  </Tabs>
+                )}
+              </Card>
+            )}
 
             {/* Posts Section */}
             <div className="mb-8">
@@ -1800,9 +2388,6 @@ const Profile = () => {
                           <p className="text-sm text-gray-300 mb-2">Gift {vegetableToGift} to:</p>
                           <Select value={selectedFriendForGift || ""} onValueChange={(value) => {
                             setSelectedFriendForGift(value);
-                            if (value && vegetableToGift) {
-                              handleGiftFromInventory(vegetableToGift, value, giftQuantity);
-                            }
                           }}>
                             <SelectTrigger className="border-[3px] border-foreground bg-gray-900 text-white">
                               <SelectValue placeholder="Select a friend..." />
@@ -1859,6 +2444,21 @@ const Profile = () => {
                             <span className="text-sm text-gray-400 ml-2">(max: {maxQuantity})</span>
                           </div>
                         </div>
+                        {selectedFriendForGift && vegetableToGift && (
+                          <div className="mt-3">
+                            <Button
+                              onClick={() => {
+                                if (selectedFriendForGift && vegetableToGift) {
+                                  handleGiftFromInventory(vegetableToGift, selectedFriendForGift, giftQuantity);
+                                }
+                              }}
+                              className="w-full border-[3px] border-foreground"
+                            >
+                              <Gift className="w-4 h-4 mr-2" />
+                              Send Gift
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     );
                   })()}
