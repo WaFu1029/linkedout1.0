@@ -17,6 +17,41 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@Lovable" />
     <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+
+    <!-- Prevent theme flash by setting theme before React loads -->
+    <script>
+      (function() {
+        // Check localStorage for saved theme preference
+        const storedTheme = localStorage.getItem('theme');
+        
+        // Default to dark theme, but respect stored preference
+        let theme = storedTheme || 'dark';
+        
+        // If no stored theme, set it to dark in localStorage to prevent system override
+        if (!storedTheme) {
+          localStorage.setItem('theme', 'dark');
+        }
+        
+        // Apply theme immediately
+        if (theme === 'dark') {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
+      })();
+    </script>
+    <!-- Set dark background immediately to prevent flash -->
+    <style>
+      html {
+        background-color: hsl(270, 20%, 8%);
+      }
+      html:not(.dark) {
+        background-color: hsl(35, 30%, 96%);
+      }
+      body {
+        background-color: inherit;
+      }
+    </style>
   </head>
 
   <body>

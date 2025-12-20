@@ -334,10 +334,52 @@ const Index = () => {
   const arrowBodyClassName = isDark ? "bg-foreground" : "bg-white";
   const arrowHeadClassName = `w-0 h-0 border-l-[35px] ${isDark ? 'border-l-foreground' : 'border-l-white'} border-y-[18px] border-y-transparent flex-shrink-0`;
   const whySectionClassName = `py-16 md:py-24 ${isDark ? 'bg-primary' : 'bg-[#f97316]'}`;
+  
+  // Track if this is a fresh load (not navigation from another page)
+  const [isFreshLoad] = useState(() => {
+    // Check on initial mount if we're navigating from another page
+    // NavigationTracker in App.tsx sets this when user is on other pages
+    const previousPath = sessionStorage.getItem('previousPath');
+    
+    console.log('Index useState initializer - previousPath:', previousPath);
+    
+    // If we have a previous path and it's not "/", this is a navigation - skip animation
+    if (previousPath && previousPath !== '/') {
+      console.log('Navigation detected - skipping animation');
+      // Clear the flag immediately
+      sessionStorage.removeItem('previousPath');
+      return false;
+    }
+    
+    // No previousPath means it's a fresh load (first visit or refresh) - play animation
+    // Clear any stale data just to be safe
+    sessionStorage.removeItem('previousPath');
+    console.log('Fresh load detected - playing animation');
+    return true;
+  });
+  
   const [showExplosion, setShowExplosion] = useState(false);
   const [showNewText, setShowNewText] = useState(false);
   const [hasTypedFirstText, setHasTypedFirstText] = useState(false);
-  const [showRestOfPage, setShowRestOfPage] = useState(false);
+  const [showRestOfPage, setShowRestOfPage] = useState(!isFreshLoad); // Skip animation if not fresh load
+  
+  // Debug: Log state on mount
+  useEffect(() => {
+    console.log('Index component state:', {
+      isFreshLoad,
+      showRestOfPage,
+      hasTypedFirstText,
+      showExplosion,
+      showNewText
+    });
+  }, [isFreshLoad, showRestOfPage, hasTypedFirstText, showExplosion, showNewText]);
+  
+  // Mark intro as seen when animation completes
+  useEffect(() => {
+    if (showRestOfPage && isFreshLoad) {
+      sessionStorage.setItem('hasSeenIntro', 'true');
+    }
+  }, [showRestOfPage, isFreshLoad]);
   const [barChartVisible, setBarChartVisible] = useState(false);
   const [lineChartVisible, setLineChartVisible] = useState(false);
   const [statVisible, setStatVisible] = useState(false);
@@ -454,38 +496,43 @@ const Index = () => {
       </div>
 
       {/* Hero Section - Fixed initially, becomes relative after explosion */}
-      <section className={`${showRestOfPage ? 'relative' : 'fixed inset-0'} flex items-center justify-center ${showRestOfPage ? 'z-0' : 'z-50'} bg-background transition-all duration-1000 ${showExplosion ? 'animate-screen-shake' : ''} ${showRestOfPage ? 'pt-48 pb-48 md:pt-56 md:pb-64 min-h-[calc(100vh-64px)]' : ''}`}>
+      <section className={`${showRestOfPage ? 'relative' : 'fixed inset-0'} flex items-center justify-center ${showRestOfPage ? 'z-0' : 'z-50'} bg-background transition-all duration-1000 ${showExplosion ? 'animate-screen-shake' : ''} ${showRestOfPage ? 'pt-48 pb-48 md:pt-56 md:pb-64 min-h-[calc(100vh-64px)]' : ''}`} style={{ backgroundColor: 'hsl(var(--background))' }}>
         <div className="container mx-auto px-4">
-          <div className="max-w-4xl mx-auto text-center relative">
+          <div className="max-w-4xl mx-auto text-center relative bg-background">
             <div className={`inline-block bg-foreground text-background px-4 py-2 mb-6 border-[3px] border-foreground font-mono text-sm transition-opacity duration-1000 ${showRestOfPage ? 'opacity-100' : 'opacity-0'}`}>
               BASICALLY EVIL LINKEDIN
             </div>
-            <h1 className="text-5xl md:text-7xl font-bold mb-6 leading-tight relative">
-            {showNewText ? (
-  <span className="block min-h-[2.4em]">
-    <TypingText 
-      key="new-text"
-      text={"Here's something that\nabsolutely flopped ..."} 
-      speed={50}
-      highlightWords={["flopped"]}
-    />
-  </span>
-) : hasTypedFirstText ? (
-  <span className="block min-h-[2.4em]">
-    <span className="invisible">I am excited to<br />announce...</span>
-    {showExplosion && (
-      <Explosion 
-        show={showExplosion}
-        text={"I am excited to\nannounce..."}
-        onComplete={() => {
-          setShowNewText(true);
-          setShowRestOfPage(true);
-        }}
-      />
-    )}
-  </span>
-) : (
-                <span className="block min-h-[2.4em]">
+            <h1 className="text-5xl md:text-7xl font-bold mb-6 leading-tight relative bg-background">
+            {!isFreshLoad ? (
+              // Skip animation if not fresh load - show final text immediately
+              <span className="block min-h-[2.4em] bg-background">
+                Here's something that<br />absolutely flopped ...
+              </span>
+            ) : showNewText ? (
+              <span className="block min-h-[2.4em] bg-background">
+                <TypingText 
+                  key="new-text"
+                  text={"Here's something that\nabsolutely flopped ..."} 
+                  speed={50}
+                  highlightWords={["flopped"]}
+                />
+              </span>
+            ) : hasTypedFirstText ? (
+              <span className="block min-h-[2.4em] bg-background">
+                <span className="invisible">I am excited to<br />announce...</span>
+                {showExplosion && (
+                  <Explosion 
+                    show={showExplosion}
+                    text={"I am excited to\nannounce..."}
+                    onComplete={() => {
+                      setShowNewText(true);
+                      setShowRestOfPage(true);
+                    }}
+                  />
+                )}
+              </span>
+            ) : (
+                <span className="block min-h-[2.4em] bg-background">
                   <TypingText 
                     key="old-text"
                     text={"I am excited to\nannounce..."}
