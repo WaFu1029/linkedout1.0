@@ -2720,54 +2720,42 @@ const Profile = () => {
                   <h2 className="font-bold text-2xl">
                     {isOwnProfile ? "My Garden" : `${firstName}'s Garden`}
                   </h2>
-                <div className="flex items-center gap-4">
-                  {isOwnProfile && (
-                    <>
-                      <div className="flex items-center gap-2 px-4 py-2 bg-secondary border-[3px] border-foreground rounded">
-                        <span className="font-bold text-lg">{points}</span>
-                        <span className="text-sm text-muted-foreground">points</span>
-                      </div>
-                      {giftsReceived > 0 && (
+                {(!selectedVegetable && !selectedInventoryItem) && (
+                  <div className="flex items-center gap-4">
+                    {isOwnProfile && (
+                      <>
                         <div className="flex items-center gap-2 px-4 py-2 bg-secondary border-[3px] border-foreground rounded">
-                          <span className="text-lg">🎁</span>
-                          <span className="font-bold text-lg">{giftsReceived}</span>
-                          <span className="text-sm text-muted-foreground">gifts received</span>
+                          <span className="font-bold text-lg">{points}</span>
+                          <span className="text-sm text-muted-foreground">points</span>
                         </div>
-                      )}
-                      {selectedVegetable && (
+                        {giftsReceived > 0 && (
+                          <div className="flex items-center gap-2 px-4 py-2 bg-secondary border-[3px] border-foreground rounded">
+                            <span className="text-lg">🎁</span>
+                            <span className="font-bold text-lg">{giftsReceived}</span>
+                            <span className="text-sm text-muted-foreground">gifts received</span>
+                          </div>
+                        )}
                         <Button
-                          variant="outline"
-                          onClick={() => {
-                            setSelectedVegetable(null);
-                            toast.info("Selection cancelled");
-                          }}
+                          onClick={() => setShopOpen(true)}
                           disabled={gardenLoading}
                           className="border-[3px] border-foreground"
                         >
-                          <XIcon className="w-4 h-4 mr-2" />
-                          Cancel
+                          <ShoppingCart className="w-4 h-4 mr-2" />
+                          Shop
                         </Button>
-                      )}
-                      <Button
-                        onClick={() => setShopOpen(true)}
-                        disabled={gardenLoading}
-                        className="border-[3px] border-foreground"
-                      >
-                        <ShoppingCart className="w-4 h-4 mr-2" />
-                        Shop
-                      </Button>
-                      <Button
-                        onClick={() => setInventoryOpen(true)}
-                        disabled={gardenLoading}
-                        variant="outline"
-                        className="border-[3px] border-foreground"
-                      >
-                        <Package className="w-4 h-4 mr-2" />
-                        Inventory
-                      </Button>
-                    </>
-                  )}
-                </div>
+                        <Button
+                          onClick={() => setInventoryOpen(true)}
+                          disabled={gardenLoading}
+                          variant="outline"
+                          className="border-[3px] border-foreground"
+                        >
+                          <Package className="w-4 h-4 mr-2" />
+                          Inventory
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                )}
                 
                 {selectedInventoryItem && isOwnProfile && (
                   <div className="mb-3 p-3 bg-primary/10 border-[3px] border-primary rounded flex items-center gap-2">
