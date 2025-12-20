@@ -180,6 +180,7 @@ const Profile = () => {
   // Shop and planting state
   const [points, setPoints] = useState(100);
   const [selectedVegetable, setSelectedVegetable] = useState<string | null>(null);
+  const [selectedInventoryItem, setSelectedInventoryItem] = useState<string | null>(null); // For planting from inventory
   const [shopOpen, setShopOpen] = useState(false);
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const [giftMode, setGiftMode] = useState(false);
@@ -524,8 +525,9 @@ const Profile = () => {
         : row
     );
 
-    // Add to inventory
-    const newInventory = addToInventory(cellEmoji, inventory);
+    // Add to inventory (harvesting gives 2 items)
+    let newInventory = addToInventory(cellEmoji, inventory);
+    newInventory = addToInventory(cellEmoji, newInventory); // Add second item
 
     // Clean inventory data to ensure proper JSON format
     const cleanInventory = newInventory.map(item => ({
@@ -572,12 +574,85 @@ const Profile = () => {
     const cellEmoji = getCellEmoji(cell);
 
     // If clicking on an occupied cell in own garden, show harvest popover
-    if (cellEmoji && isOwnProfile && !selectedVegetable) {
+    if (cellEmoji && isOwnProfile && !selectedVegetable && !selectedInventoryItem) {
       setHarvestPopoverOpen({ row: rowIndex, col: colIndex });
       return;
     }
 
-    // Otherwise, handle planting/gifting
+    // Handle planting from inventory
+    if (selectedInventoryItem) {
+      if (!isOwnProfile) {
+        return;
+      }
+      
+      // Check if cell is already occupied
+      if (cellEmoji) {
+        return;
+      }
+      
+      // Check if user has this item in inventory
+      const inventoryItem = inventory.find(item => item.emoji === selectedInventoryItem);
+      if (!inventoryItem || inventoryItem.count <= 0) {
+        toast.error("You don't have this item in your inventory!");
+        setSelectedInventoryItem(null);
+        return;
+      }
+      
+      // Plant from inventory (not gifted)
+      const plantCell: GardenCell = { emoji: selectedInventoryItem, gifted: false };
+      const newGrid = gardenGrid.map((row, r) =>
+        r === rowIndex
+          ? row.map((cell, c) => (c === colIndex ? plantCell : cell))
+          : row
+      );
+      
+      // Remove one from inventory
+      const newInventory = inventory.map(item =>
+        item.emoji === selectedInventoryItem
+          ? { ...item, count: item.count - 1 }
+          : item
+      ).filter(item => item.count > 0);
+      
+      // Update local state immediately
+      setGardenGrid(newGrid);
+      setInventory(newInventory);
+      setSelectedInventoryItem(null);
+      
+      // Save to database
+      try {
+        const cleanInventory = newInventory.map(item => ({
+          emoji: item.emoji,
+          count: item.count
+        }));
+        
+        const { error } = await supabase
+          .from("profiles")
+          .update({
+            garden_grid: newGrid,
+            inventory: cleanInventory,
+          })
+          .eq("id", profile?.id);
+        
+        if (error) {
+          // Revert on error
+          setGardenGrid(gardenGrid);
+          setInventory(inventory);
+          console.error("Error planting from inventory:", error);
+          toast.error("Failed to plant. Please try again.");
+        } else {
+          toast.success(`Planted ${selectedInventoryItem} from inventory!`);
+        }
+      } catch (error) {
+        // Revert on error
+        setGardenGrid(gardenGrid);
+        setInventory(inventory);
+        console.error("Error planting from inventory:", error);
+        toast.error("Failed to plant. Please try again.");
+      }
+      return;
+    }
+
+    // Otherwise, handle planting from shop
     if (!selectedVegetable) {
       return; // Do nothing if no vegetable is selected
     }
@@ -2530,6 +2605,22 @@ const Profile = () => {
                   )}
                 </div>
                 
+                {selectedInventoryItem && isOwnProfile && (
+                  <div className="mb-3 p-3 bg-primary/10 border-[3px] border-primary rounded flex items-center gap-2">
+                    <span className="text-2xl">{selectedInventoryItem}</span>
+                    <span className="font-semibold">
+                      Planting from inventory: {selectedInventoryItem}
+                    </span>
+                    <Button
+                      onClick={() => setSelectedInventoryItem(null)}
+                      size="sm"
+                      variant="outline"
+                      className="ml-auto border-[2px] border-foreground"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                )}
                 {selectedVegetable && isOwnProfile && (
                   <div className="mb-3 p-3 bg-primary/10 border-[3px] border-primary rounded flex items-center gap-2">
                     <span className="text-2xl">{selectedVegetable}</span>
@@ -2539,6 +2630,14 @@ const Profile = () => {
                     <span className="text-sm text-muted-foreground">
                       Click an empty cell to plant
                     </span>
+                    <Button
+                      onClick={() => setSelectedVegetable(null)}
+                      size="sm"
+                      variant="outline"
+                      className="ml-auto border-[2px] border-foreground"
+                    >
+                      Cancel
+                    </Button>
                   </div>
                 )}
               </div>
@@ -2566,8 +2665,8 @@ const Profile = () => {
                       row.map((cell, colIndex) => {
                         const cellEmoji = getCellEmoji(cell);
                         const isGifted = isCellGifted(cell);
-                        const canPlant = isOwnProfile && !cellEmoji && !gardenLoading && selectedVegetable;
-                        const canHarvest = isOwnProfile && cellEmoji && !selectedVegetable && !gardenLoading;
+                        const canPlant = isOwnProfile && !cellEmoji && !gardenLoading && (selectedVegetable || selectedInventoryItem);
+                        const canHarvest = isOwnProfile && cellEmoji && !selectedVegetable && !selectedInventoryItem && !gardenLoading;
                         const isPopoverOpen = harvestPopoverOpen?.row === rowIndex && harvestPopoverOpen?.col === colIndex;
                         
                         if (canHarvest) {
@@ -2617,14 +2716,14 @@ const Profile = () => {
                           <button
                             key={`${rowIndex}-${colIndex}`}
                             onClick={() => handleCellClick(rowIndex, colIndex)}
-                            disabled={!canPlant}
+                            disabled={!canPlant && !selectedInventoryItem}
                             className={`
                               w-full h-full flex items-center justify-center border-2 transition-all relative
                               ${cellEmoji 
                                 ? isGifted
                                   ? 'bg-amber-700 border-amber-500 shadow-[0_0_8px_rgba(251,191,36,0.6)]' 
                                   : 'bg-amber-700 border-amber-600'
-                                : selectedVegetable && canPlant
+                                : (selectedVegetable || selectedInventoryItem) && canPlant
                                 ? 'bg-amber-900/50 border-dashed border-amber-600 hover:bg-amber-800/50'
                                 : 'bg-amber-900/30 border-dashed border-amber-700/50'
                               }
@@ -2666,6 +2765,7 @@ const Profile = () => {
                   setSelectedFriendForGift(null);
                   setGiftQuantity(1);
                   setInventoryPopoverOpen(null);
+                  setSelectedInventoryItem(null);
                 }
               }}>
                 <DialogContent className="border-[3px] border-foreground shadow-brutal max-w-2xl bg-[#1a1a1a]">
@@ -2815,29 +2915,44 @@ const Profile = () => {
                             <PopoverContent className="w-auto p-2 border-[3px] border-foreground shadow-brutal bg-gray-900">
                               <div className="flex flex-col gap-2">
                                 <p className="text-sm font-semibold text-white mb-1">{item.emoji} (x{item.count})</p>
-                                <div className="flex gap-2">
+                                <div className="flex flex-col gap-2">
                                   <Button
                                     onClick={() => {
-                                      setVegetableToGift(item.emoji);
-                                      setGiftQuantity(1);
-                                      setSelectedFriendForGift(null);
+                                      setSelectedInventoryItem(item.emoji);
                                       setInventoryPopoverOpen(null);
+                                      setInventoryOpen(false);
+                                      toast.info(`Click an empty garden cell to plant ${item.emoji}`);
                                     }}
                                     size="sm"
-                                    className="border-[3px] border-foreground flex-1"
+                                    className="border-[3px] border-foreground w-full"
                                   >
-                                    <Gift className="w-3 h-3 mr-1" />
-                                    Gift
+                                    <Sparkles className="w-3 h-3 mr-1" />
+                                    Plant
                                   </Button>
-                                  <Button
-                                    onClick={() => handleDeleteFromInventory(item.emoji)}
-                                    size="sm"
-                                    variant="destructive"
-                                    className="border-[3px] border-foreground"
-                                  >
-                                    <Trash2 className="w-3 h-3 mr-1" />
-                                    Delete
-                                  </Button>
+                                  <div className="flex gap-2">
+                                    <Button
+                                      onClick={() => {
+                                        setVegetableToGift(item.emoji);
+                                        setGiftQuantity(1);
+                                        setSelectedFriendForGift(null);
+                                        setInventoryPopoverOpen(null);
+                                      }}
+                                      size="sm"
+                                      className="border-[3px] border-foreground flex-1"
+                                    >
+                                      <Gift className="w-3 h-3 mr-1" />
+                                      Gift
+                                    </Button>
+                                    <Button
+                                      onClick={() => handleDeleteFromInventory(item.emoji)}
+                                      size="sm"
+                                      variant="destructive"
+                                      className="border-[3px] border-foreground"
+                                    >
+                                      <Trash2 className="w-3 h-3 mr-1" />
+                                      Delete
+                                    </Button>
+                                  </div>
                                 </div>
                               </div>
                             </PopoverContent>
