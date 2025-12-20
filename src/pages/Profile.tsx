@@ -385,8 +385,8 @@ const Profile = () => {
       return;
     }
 
-    // Calculate sell price (1.5x original cost)
-    const sellPrice = Math.floor(shopItem.cost * 1.5);
+    // Calculate sell price (110% of original cost - 10% more)
+    const sellPrice = Math.floor(shopItem.cost * 1.1);
     const newPoints = points + sellPrice;
 
     // Remove one from inventory (or remove entirely if count is 1)
@@ -3124,7 +3124,7 @@ const Profile = () => {
                                 <p className="text-sm font-semibold text-white mb-1">{item.emoji} (x{item.count})</p>
                                 {(() => {
                                   const shopItem = allVegetables.find(v => v.emoji === item.emoji);
-                                  const sellPrice = shopItem ? Math.floor(shopItem.cost * 1.5) : 0;
+                                  const sellPrice = shopItem ? Math.floor(shopItem.cost * 1.1) : 0;
                                   return shopItem ? (
                                     <p className="text-xs text-gray-400 mb-1">Sell for {sellPrice} points</p>
                                   ) : null;
