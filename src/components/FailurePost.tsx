@@ -107,6 +107,19 @@ export function FailurePost({
 
     setIsReacting(true);
     try {
+      // Get post author to check if user is trying to like their own post
+      const { data: postData } = await supabase
+        .from("posts")
+        .select("author_id")
+        .eq("id", id)
+        .single();
+
+      if (!postData) {
+        throw new Error("Post not found");
+      }
+
+      const isOwnPost = user.id === postData.author_id;
+
       // Check if user already has a reaction
       const { data: existingReaction } = await supabase
         .from("reactions")
@@ -115,9 +128,13 @@ export function FailurePost({
         .eq("user_id", user.id)
         .single();
 
+      let shouldAwardPoints = false;
+      let wasLiking = false;
+
       if (existingReaction) {
         if (existingReaction.reaction_type === reactionType) {
           // Remove reaction if clicking the same one
+          wasLiking = existingReaction.reaction_type === 'like';
           const { error } = await supabase
             .from("reactions")
             .delete()
@@ -128,6 +145,7 @@ export function FailurePost({
           setUserReaction(null);
         } else {
           // Replace reaction if clicking different one
+          wasLiking = existingReaction.reaction_type === 'like';
           const { error } = await supabase
             .from("reactions")
             .update({ reaction_type: reactionType })
@@ -136,6 +154,10 @@ export function FailurePost({
 
           if (error) throw error;
           setUserReaction(reactionType);
+          // If changing to like, check if we should award points
+          if (reactionType === 'like' && !wasLiking) {
+            shouldAwardPoints = true;
+          }
         }
       } else {
         // Add new reaction
@@ -149,6 +171,50 @@ export function FailurePost({
 
         if (error) throw error;
         setUserReaction(reactionType);
+        // If it's a new like, check if we should award points
+        if (reactionType === 'like') {
+          shouldAwardPoints = true;
+        }
+      }
+
+      // Award points if this is a new unique like from someone other than the author
+      if (shouldAwardPoints && !isOwnPost) {
+        // Check if this user has already given points for this post
+        const { data: existingPoints } = await supabase
+          .from("reaction_points_awarded")
+          .select("id")
+          .eq("post_id", id)
+          .eq("user_id", user.id)
+          .single();
+
+        if (!existingPoints) {
+          // Award points to post author
+          const { data: authorProfile } = await supabase
+            .from("profiles")
+            .select("garden_points")
+            .eq("id", postData.author_id)
+            .single();
+
+          if (authorProfile) {
+            const newPoints = (authorProfile.garden_points || 0) + 10;
+            const { error: pointsError } = await supabase
+              .from("profiles")
+              .update({ garden_points: newPoints })
+              .eq("id", postData.author_id);
+
+            if (!pointsError) {
+              // Track that this user has given points for this post
+              await supabase
+                .from("reaction_points_awarded")
+                .insert({
+                  post_id: id,
+                  user_id: user.id,
+                  author_id: postData.author_id,
+                  points_awarded: 10,
+                });
+            }
+          }
+        }
       }
 
       // Invalidate queries to refresh reactions
