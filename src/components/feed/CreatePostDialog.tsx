@@ -330,20 +330,23 @@ export function CreatePostDialog({ open, onOpenChange, userId }: CreatePostDialo
       // Update posting streak and award points
       const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
       
-      // Count posts made today (including this one)
+      // Count posts made today BEFORE this one (to determine which post number this is)
       const todayStart = new Date(today + 'T00:00:00.000Z').toISOString();
       const tomorrowStart = new Date(today + 'T23:59:59.999Z');
       tomorrowStart.setDate(tomorrowStart.getDate() + 1);
       const tomorrowStartISO = tomorrowStart.toISOString();
       
-      const { count: postsTodayCount } = await supabase
+      // Count posts BEFORE this one was inserted (exclude the post we just created by using created_at < now)
+      // Actually, since we just inserted, we need to count all posts today, then subtract 1, or count excluding this post's ID
+      const { count: postsTodayBeforeThis } = await supabase
         .from("posts")
         .select("*", { count: "exact", head: true })
         .eq("author_id", userId)
         .gte("created_at", todayStart)
-        .lt("created_at", tomorrowStartISO);
+        .lt("created_at", tomorrowStartISO)
+        .neq("id", data.id); // Exclude the post we just created
       
-      const postNumber = (postsTodayCount || 0) + 1; // This is the Nth post today
+      const postNumber = (postsTodayBeforeThis || 0) + 1; // This is the Nth post today
       
       const { data: profileData } = await supabase
         .from("profiles")
@@ -396,29 +399,59 @@ export function CreatePostDialog({ open, onOpenChange, userId }: CreatePostDialo
           const streakBonus = Math.max(0, (effectiveStreak - 1) * 2);
           
           pointsToAward = basePoints + streakBonus;
+          
+          console.log("Points calculation:", {
+            postNumber,
+            basePoints,
+            effectiveStreak,
+            streakBonus,
+            pointsToAward,
+            willContributeToStreak,
+            newStreak,
+            currentStreak: profileData.posting_streak
+          });
+        } else {
+          console.log("No points - post number > 3:", postNumber);
         }
 
         // Update streak, last post date, and points
         const updateData: any = {};
         
+        // Update streak and last_post_date if this is a new day
         if (lastPostDate !== today) {
           updateData.posting_streak = newStreak;
           updateData.last_post_date = today;
         }
         
+        // Always update points if we're awarding them (even if already posted today)
         if (pointsToAward > 0) {
           updateData.garden_points = (profileData.garden_points || 0) + pointsToAward;
         }
 
+        console.log("Update data:", updateData);
+        console.log("Points to award:", pointsToAward);
+        
         if (Object.keys(updateData).length > 0) {
-          await supabase
+          const { error: updateError, data: updateResult } = await supabase
             .from("profiles")
             .update(updateData)
-            .eq("id", userId);
+            .eq("id", userId)
+            .select();
 
-          // Invalidate profile queries to refresh UI
-          queryClient.invalidateQueries({ queryKey: ["profile"] });
-          queryClient.invalidateQueries({ queryKey: ["profile-posting-streak", userId] });
+          if (updateError) {
+            console.error("Error updating profile (streak/points):", updateError);
+            console.error("Update data:", updateData);
+            // Don't fail the whole operation, but log the error
+            toast.error("Post created, but failed to update streak/points. Please refresh.");
+          } else {
+            console.log("Profile updated successfully:", updateResult);
+            // Invalidate profile queries to refresh UI
+            queryClient.invalidateQueries({ queryKey: ["profile"] });
+            queryClient.invalidateQueries({ queryKey: ["profile-posting-streak", userId] });
+            queryClient.invalidateQueries({ queryKey: ["posts-today-count", userId] });
+          }
+        } else {
+          console.log("No update data - skipping profile update");
         }
         
         // Show points notification if awarded
