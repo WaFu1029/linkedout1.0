@@ -140,6 +140,8 @@ interface Profile {
   inventory?: InventoryItem[] | null;
   login_streak?: number | null;
   last_login_date?: string | null;
+  posting_streak?: number | null;
+  last_post_date?: string | null;
 }
 
 const Profile = () => {
@@ -1433,6 +1435,8 @@ const Profile = () => {
                 industry: user!.user_metadata?.industry || null,
                 login_streak: 1,
                 last_login_date: today,
+                posting_streak: 0,
+                last_post_date: null,
               })
               .select()
               .single();
@@ -1570,6 +1574,8 @@ const Profile = () => {
                 industry: user.user_metadata?.industry || null,
                 login_streak: 1,
                 last_login_date: today,
+                posting_streak: 0,
+                last_post_date: null,
               })
               .select()
               .single();
@@ -2091,6 +2097,14 @@ const Profile = () => {
                         <Flame className="w-4 h-4 text-orange-600 dark:text-orange-400" />
                         <span className="text-sm font-bold text-orange-700 dark:text-orange-300">
                           {profile.login_streak} day{profile.login_streak !== 1 ? 's' : ''}
+                        </span>
+                      </div>
+                    )}
+                    {profile.posting_streak !== null && profile.posting_streak !== undefined && profile.posting_streak > 0 && (
+                      <div className="flex items-center gap-1 px-3 py-1 bg-purple-100 dark:bg-purple-900/30 border-[2px] border-purple-500 rounded-md">
+                        <Edit2 className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                        <span className="text-sm font-bold text-purple-700 dark:text-purple-300">
+                          {profile.posting_streak} day{profile.posting_streak !== 1 ? 's' : ''}
                         </span>
                       </div>
                     )}

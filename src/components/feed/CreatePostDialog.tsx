@@ -207,7 +207,55 @@ export function CreatePostDialog({ open, onOpenChange, userId }: CreatePostDialo
 
       // Invalidate and refetch posts
       queryClient.invalidateQueries({ queryKey: ["posts"] });
-      
+
+      // Update posting streak
+      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("posting_streak, last_post_date")
+        .eq("id", userId)
+        .single();
+
+      if (profileData) {
+        const lastPostDate = profileData.last_post_date;
+        let newStreak = profileData.posting_streak || 0;
+
+        if (!lastPostDate) {
+          // First post - start streak at 1
+          newStreak = 1;
+        } else if (lastPostDate === today) {
+          // Already posted today - don't update streak
+          // Keep current streak
+        } else {
+          // Check if last post was yesterday
+          const yesterday = new Date();
+          yesterday.setDate(yesterday.getDate() - 1);
+          const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+          if (lastPostDate === yesterdayStr) {
+            // Consecutive day - increment streak
+            newStreak = (profileData.posting_streak || 0) + 1;
+          } else {
+            // Streak broken - reset to 1
+            newStreak = 1;
+          }
+        }
+
+        // Update streak and last post date if needed
+        if (lastPostDate !== today) {
+          await supabase
+            .from("profiles")
+            .update({
+              posting_streak: newStreak,
+              last_post_date: today,
+            })
+            .eq("id", userId);
+
+          // Invalidate profile queries to refresh UI
+          queryClient.invalidateQueries({ queryKey: ["profile"] });
+        }
+      }
+
       toast.success("Your failure has been shared!");
       setTitle("");
       setContent("");
