@@ -169,7 +169,7 @@ const Profile = () => {
   const [connectionRequests, setConnectionRequests] = useState<Array<{id: string, user_id: string, full_name: string | null, email: string | null, industry: string | null, created_at: string}>>([]);
   const [commentNotifications, setCommentNotifications] = useState<Array<{id: string, post_id: string, author_id: string, author_name: string | null, author_email: string | null, content: string, created_at: string, post_title: string | null}>>([]);
   const [reactionNotifications, setReactionNotifications] = useState<Array<{id: string, post_id: string, user_id: string, user_name: string | null, user_email: string | null, reaction_type: string, created_at: string, post_title: string | null}>>([]);
-  const [giftNotifications, setGiftNotifications] = useState<Array<{id: string, gifter_id: string, gifter_name: string | null, gifter_email: string | null, emoji: string, quantity: number, created_at: string}>>([]);
+  const [giftNotifications, setGiftNotifications] = useState<Array<{id: string, gifter_id: string, gifter_name: string | null, gifter_email: string | null, emoji: string, quantity: number, created_at: string, post_id: string | null, post_title: string | null}>>([]);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   
   // Emoji garden grid state - supports both old format (string) and new format (object)
@@ -1300,7 +1300,7 @@ const Profile = () => {
         try {
           const { data: gifts, error: giftsError } = await supabase
             .from("gifts")
-            .select("id, gifter_id, emoji, quantity, created_at")
+            .select("id, gifter_id, emoji, quantity, created_at, post_id")
             .eq("recipient_id", user.id)
             .order("created_at", { ascending: false })
             .limit(50);
@@ -1328,6 +1328,17 @@ const Profile = () => {
 
               const profileMap = new Map(gifterProfiles?.map(p => [p.id, p]) || []);
               
+              // Fetch post titles for gifts that came from posts
+              const postIds = undismissedGifts.filter(g => g.post_id).map(g => g.post_id);
+              let postMap = new Map<string, string>();
+              if (postIds.length > 0) {
+                const { data: posts } = await supabase
+                  .from("posts")
+                  .select("id, title")
+                  .in("id", postIds);
+                postMap = new Map(posts?.map(p => [p.id, p.title || 'Untitled']) || []);
+              }
+              
               // Create individual notifications for each gift (not aggregated)
               const giftNotifs = undismissedGifts.map(gift => {
                 const gifterProfile = profileMap.get(gift.gifter_id);
@@ -1338,7 +1349,9 @@ const Profile = () => {
                   gifter_email: gifterProfile?.email || null,
                   emoji: gift.emoji,
                   quantity: gift.quantity,
-                  created_at: gift.created_at
+                  created_at: gift.created_at,
+                  post_id: gift.post_id || null,
+                  post_title: gift.post_id ? (postMap.get(gift.post_id) || null) : null
                 };
               });
               setGiftNotifications(giftNotifs);
@@ -2498,6 +2511,9 @@ const Profile = () => {
                                       {gift.gifter_name || gift.gifter_email?.split("@")[0] || "Someone"}
                                     </span>
                                     {" "}gifted you {gift.quantity}x {gift.emoji}
+                                    {gift.post_title && (
+                                      <> from your post, "{gift.post_title}"</>
+                                    )}
                                   </p>
                                   <p className="text-xs text-muted-foreground mt-1">
                                     {formatDistanceToNow(new Date(gift.created_at), { addSuffix: true })}
@@ -2641,6 +2657,9 @@ const Profile = () => {
                                     {gift.gifter_name || gift.gifter_email?.split("@")[0] || "Someone"}
                                   </span>
                                   {" "}gifted you {gift.quantity}x {gift.emoji}
+                                  {gift.post_title && (
+                                    <> from your post, "{gift.post_title}"</>
+                                  )}
                                 </p>
                                 <p className="text-xs text-muted-foreground mt-1">
                                   {formatDistanceToNow(new Date(gift.created_at), { addSuffix: true })}

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { MessageCircle, ChevronDown, ChevronUp, ThumbsUp, ThumbsDown, Trash2 } from "lucide-react";
+import { MessageCircle, ChevronDown, ChevronUp, ThumbsUp, ThumbsDown, Trash2, Gift } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
@@ -19,6 +19,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface Reaction {
   like?: number;
@@ -51,6 +58,11 @@ export function SwipePostCard({ post, currentUserEmail, comments = [], isMobile 
   const [userReaction, setUserReaction] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showGiftDialog, setShowGiftDialog] = useState(false);
+  const [userInventory, setUserInventory] = useState<Array<{emoji: string, count: number}>>([]);
+  const [selectedGiftItem, setSelectedGiftItem] = useState<string | null>(null);
+  const [giftQuantity, setGiftQuantity] = useState(1);
+  const [isGifting, setIsGifting] = useState(false);
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { theme } = useTheme();
@@ -84,6 +96,163 @@ export function SwipePostCard({ post, currentUserEmail, comments = [], isMobile 
 
     fetchUserReaction();
   }, [user, post.id]);
+
+  // Fetch user's inventory when gift dialog opens
+  useEffect(() => {
+    const fetchInventory = async () => {
+      if (!showGiftDialog || !user || isOwnPost) return;
+
+      try {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("inventory")
+          .eq("id", user.id)
+          .single();
+
+        if (profile?.inventory && Array.isArray(profile.inventory)) {
+          const cleanInventory = profile.inventory.map((item: any) => ({
+            emoji: item.emoji,
+            count: typeof item.count === 'number' ? item.count : 1
+          }));
+          setUserInventory(cleanInventory);
+        } else {
+          setUserInventory([]);
+        }
+      } catch (error) {
+        console.error("Error fetching inventory:", error);
+        setUserInventory([]);
+      }
+    };
+
+    fetchInventory();
+  }, [showGiftDialog, user, isOwnPost]);
+
+  const handleGiftToPostAuthor = async (emoji: string, quantity: number) => {
+    if (!user || !post.author_id || isOwnPost || isGifting) return;
+
+    // Check if user has enough of this vegetable in inventory
+    const inventoryItem = userInventory.find(item => item.emoji === emoji);
+    if (!inventoryItem || inventoryItem.count < quantity) {
+      toast.error(`You don't have enough ${emoji}! You have ${inventoryItem?.count || 0}, trying to gift ${quantity}.`);
+      return;
+    }
+
+    setIsGifting(true);
+    try {
+      // Fetch recipient's inventory
+      const { data: recipientProfile, error: fetchError } = await supabase
+        .from("profiles")
+        .select("inventory, gifts_received")
+        .eq("id", post.author_id)
+        .single();
+
+      if (fetchError) {
+        console.error("Error fetching recipient profile:", fetchError);
+        throw fetchError;
+      }
+      if (!recipientProfile) {
+        toast.error("User not found");
+        return;
+      }
+
+      // Parse recipient's inventory
+      let recipientInventory: Array<{emoji: string, count: number}> = [];
+      if (recipientProfile.inventory && Array.isArray(recipientProfile.inventory)) {
+        recipientInventory = recipientProfile.inventory.map((item: any) => ({
+          emoji: item.emoji,
+          count: typeof item.count === 'number' ? item.count : 1
+        }));
+      }
+
+      // Add gifts to recipient's inventory
+      const existingItem = recipientInventory.find(item => item.emoji === emoji);
+      let newRecipientInventory: Array<{emoji: string, count: number}>;
+      
+      if (existingItem) {
+        newRecipientInventory = recipientInventory.map(item =>
+          item.emoji === emoji
+            ? { ...item, count: item.count + quantity }
+            : item
+        );
+      } else {
+        newRecipientInventory = [...recipientInventory, { emoji, count: quantity }];
+      }
+
+      const cleanRecipientInventory = newRecipientInventory.map(item => ({
+        emoji: item.emoji,
+        count: item.count
+      }));
+
+      // Update gifter's inventory (decrement by quantity, remove if 0)
+      const newInventory = userInventory.map(item => {
+        if (item.emoji === emoji) {
+          return { ...item, count: item.count - quantity };
+        }
+        return item;
+      }).filter(item => item.count > 0);
+
+      const cleanInventory = newInventory.map(item => ({
+        emoji: item.emoji,
+        count: item.count
+      }));
+
+      // Update recipient's inventory and gifts_received
+      const newGiftsReceived = (recipientProfile.gifts_received || 0) + quantity;
+      const { error: recipientError } = await supabase
+        .from("profiles")
+        .update({
+          inventory: cleanRecipientInventory,
+          gifts_received: newGiftsReceived,
+        })
+        .eq("id", post.author_id);
+
+      if (recipientError) throw recipientError;
+
+      // Update gifter's inventory
+      const { error: gifterError } = await supabase
+        .from("profiles")
+        .update({
+          inventory: cleanInventory,
+        })
+        .eq("id", user.id);
+
+      if (gifterError) throw gifterError;
+
+      // Create gift record for notifications (one record per transaction with actual quantity)
+      try {
+        const { error: giftsError } = await supabase
+          .from("gifts")
+          .insert({
+            gifter_id: user.id,
+            recipient_id: post.author_id,
+            emoji: emoji,
+            quantity: quantity,
+            post_id: post.id, // Track which post this gift came from
+          });
+
+        if (giftsError) {
+          console.error("Error creating gift records:", giftsError);
+          // Don't throw - gift was successful, notification is secondary
+        }
+      } catch (giftRecordError) {
+        console.error("Error creating gift records:", giftRecordError);
+        // Don't throw - gift was successful
+      }
+
+      // Update local state
+      setUserInventory(newInventory);
+      setShowGiftDialog(false);
+      setSelectedGiftItem(null);
+      setGiftQuantity(1);
+      
+      toast.success(`Gifted ${quantity}x ${emoji} to ${firstName}!`);
+    } catch (error) {
+      console.error("Error gifting to post author:", error);
+      toast.error("Failed to send gift. Please try again.");
+    } finally {
+      setIsGifting(false);
+    }
+  };
 
   const handleReaction = async (reactionType: 'like' | 'dislike') => {
     if (!user) {
@@ -367,6 +536,16 @@ export function SwipePostCard({ post, currentUserEmail, comments = [], isMobile 
           <span>Dislike</span>
           {reactions.dislike > 0 && <span>· {reactions.dislike}</span>}
         </button>
+        {!isOwnPost && user && (
+          <button
+            onClick={() => setShowGiftDialog(true)}
+            disabled={isGifting}
+            className="px-3 py-2 border-[3px] border-foreground font-semibold text-sm shadow-brutal transition-all flex items-center gap-2 hover:shadow-brutal-hover hover:translate-x-[2px] hover:translate-y-[2px]"
+          >
+            <Gift className="w-4 h-4" />
+            Gift
+          </button>
+        )}
       </div>
 
       {/* Comments */}
@@ -449,6 +628,124 @@ export function SwipePostCard({ post, currentUserEmail, comments = [], isMobile 
           )}
         </div>
       )}
+
+      {/* Gift Dialog */}
+      <Dialog open={showGiftDialog} onOpenChange={(open) => {
+        setShowGiftDialog(open);
+        if (!open) {
+          setSelectedGiftItem(null);
+          setGiftQuantity(1);
+        }
+      }}>
+        <DialogContent className="border-[3px] border-foreground shadow-brutal max-w-2xl bg-[#1a1a1a]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl text-white">Gift to {firstName}</DialogTitle>
+            <DialogDescription className="text-gray-400">
+              Select a vegetable from your inventory to gift
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedGiftItem && (() => {
+            const item = userInventory.find(i => i.emoji === selectedGiftItem);
+            const maxQuantity = item?.count || 1;
+            
+            return (
+              <div className="mb-4 p-4 bg-gray-800 border-[3px] border-foreground rounded space-y-3">
+                <div>
+                  <p className="text-sm text-gray-300 mb-2">Gift {selectedGiftItem} to {firstName}:</p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setGiftQuantity(Math.max(1, giftQuantity - 1))}
+                      disabled={giftQuantity <= 1}
+                      className="border-[3px] border-foreground"
+                    >
+                      -
+                    </Button>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={maxQuantity}
+                      value={giftQuantity}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value) || 1;
+                        setGiftQuantity(Math.max(1, Math.min(maxQuantity, val)));
+                      }}
+                      className="w-20 text-center border-[3px] border-foreground bg-gray-900 text-white"
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setGiftQuantity(Math.min(maxQuantity, giftQuantity + 1))}
+                      disabled={giftQuantity >= maxQuantity}
+                      className="border-[3px] border-foreground"
+                    >
+                      +
+                    </Button>
+                    <span className="text-sm text-gray-400 ml-2">(max: {maxQuantity})</span>
+                  </div>
+                </div>
+                <Button
+                  onClick={() => {
+                    if (selectedGiftItem) {
+                      handleGiftToPostAuthor(selectedGiftItem, giftQuantity);
+                    }
+                  }}
+                  disabled={isGifting}
+                  className="w-full border-[3px] border-foreground"
+                >
+                  <Gift className="w-4 h-4 mr-2" />
+                  {isGifting ? "Sending..." : `Send Gift (${giftQuantity}x ${selectedGiftItem})`}
+                </Button>
+              </div>
+            );
+          })()}
+
+          <div className="mt-4 p-4 bg-[#1a1a1a]">
+            <div 
+              className="grid gap-2"
+              style={{ 
+                gridTemplateColumns: 'repeat(8, 1fr)',
+                gridTemplateRows: 'repeat(4, 1fr)'
+              }}
+            >
+              {Array.from({ length: 32 }).map((_, index) => {
+                const item = index < userInventory.length ? userInventory[index] : null;
+                
+                if (!item) {
+                  return (
+                    <div
+                      key={index}
+                      className="aspect-square border-2 bg-gray-950 border-gray-800 border-t-gray-900 border-l-gray-900 border-b-gray-700 border-r-gray-700 shadow-[inset_0_2px_4px_rgba(0,0,0,0.5)]"
+                    />
+                  );
+                }
+                
+                return (
+                  <button
+                    key={index}
+                    onClick={() => {
+                      setSelectedGiftItem(item.emoji);
+                      setGiftQuantity(1);
+                    }}
+                    className={`aspect-square border-2 flex items-center justify-center relative transition-all bg-gray-800 border-gray-600 border-t-gray-500 border-l-gray-500 border-b-gray-700 border-r-gray-700 hover:bg-gray-700 cursor-pointer shadow-[inset_0_2px_4px_rgba(0,0,0,0.5)] ${
+                      selectedGiftItem === item.emoji ? 'ring-2 ring-primary' : ''
+                    }`}
+                  >
+                    <span className="text-2xl">{item.emoji}</span>
+                    {item.count > 1 && (
+                      <span className="absolute bottom-0 right-0 bg-gray-900 text-white text-xs font-bold px-1 rounded border border-gray-700">
+                        {item.count}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
