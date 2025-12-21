@@ -1,6 +1,13 @@
 -- Verify and fix gifts table structure and RLS policies
 -- This ensures gifts table works correctly with auth.users
 
+-- First, ensure post_id column exists (from migration 14)
+ALTER TABLE public.gifts
+ADD COLUMN IF NOT EXISTS post_id UUID REFERENCES public.posts(id) ON DELETE CASCADE;
+
+-- Create index for post_id if it doesn't exist
+CREATE INDEX IF NOT EXISTS idx_gifts_post_id ON public.gifts(post_id);
+
 -- First, ensure foreign keys reference auth.users (in case migration 16 wasn't run)
 DO $$
 BEGIN

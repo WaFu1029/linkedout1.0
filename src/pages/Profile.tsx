@@ -1301,6 +1301,17 @@ const Profile = () => {
         // Fetch gift notifications from gifts table
         try {
           console.log("Fetching gift notifications for user:", user.id);
+          console.log("Current auth user:", await supabase.auth.getUser().then(r => r.data.user?.id));
+          
+          // Try a simpler query first to test RLS
+          const { data: testGifts, error: testError } = await supabase
+            .from("gifts")
+            .select("id")
+            .eq("recipient_id", user.id)
+            .limit(1);
+          
+          console.log("Test query result:", { testGifts, testError });
+          
           const { data: gifts, error: giftsError } = await supabase
             .from("gifts")
             .select("id, gifter_id, emoji, quantity, created_at, post_id")
@@ -1311,23 +1322,41 @@ const Profile = () => {
           if (giftsError) {
             // Log all error details for debugging
             console.error("Error fetching gifts:", giftsError);
+            console.error("Gifts error object:", giftsError);
             console.error("Gifts error code:", giftsError.code);
             console.error("Gifts error message:", giftsError.message);
             console.error("Gifts error details:", JSON.stringify(giftsError, null, 2));
+            console.error("Gifts error hint:", (giftsError as any).hint);
+            console.error("Full error:", giftsError);
             
-            // If table doesn't exist, that's okay - just log and continue
-            if (giftsError.code === '42P01' || giftsError.message?.includes('does not exist')) {
+            // Check for specific error types
+            const errorMessage = giftsError.message || '';
+            const errorCode = giftsError.code || '';
+            
+            if (errorCode === '42P01' || errorMessage.includes('does not exist') || (errorMessage.includes('relation') && errorMessage.includes('does not exist'))) {
               console.log("Gifts table doesn't exist yet. Run migration 20240101000010_create_gifts_table.sql");
+            } else if (errorCode === 'PGRST301' || errorMessage.includes('permission denied') || errorMessage.includes('row-level security') || errorMessage.includes('RLS')) {
+              console.error("RLS policy issue - user may not have permission to read gifts. Check RLS policies.");
+            } else if (errorCode === 'PGRST116' || errorMessage.includes('JSON object requested')) {
+              console.error("Column selection issue - check if all columns exist");
             } else {
-              console.error("Gifts query failed - this might be an RLS policy issue or table structure issue");
+              console.error("Gifts query failed - HTTP 400 Bad Request. Error code:", errorCode, "message:", errorMessage);
+              console.error("This might be an RLS policy issue. Verify the 'Gifts are viewable by recipient' policy exists.");
             }
             setGiftNotifications([]);
           } else {
             console.log("Fetched gifts:", gifts?.length || 0, "gifts");
             if (gifts && gifts.length > 0) {
               console.log("Sample gift:", gifts[0]);
+              console.log("Dismissed set size:", dismissedSet.size);
+              console.log("Dismissed set contents:", Array.from(dismissedSet));
+              console.log("Checking if gift is dismissed:", gifts[0].id, dismissedSet.has(`gift:${gifts[0].id}`));
               // Filter out dismissed gifts
-              const undismissedGifts = gifts.filter(g => !dismissedSet.has(`gift:${g.id}`));
+              const undismissedGifts = gifts.filter(g => {
+                const isDismissed = dismissedSet.has(`gift:${g.id}`);
+                console.log(`Gift ${g.id} dismissed?`, isDismissed);
+                return !isDismissed;
+              });
               console.log("Undismissed gifts:", undismissedGifts.length);
               
               if (undismissedGifts.length > 0) {
