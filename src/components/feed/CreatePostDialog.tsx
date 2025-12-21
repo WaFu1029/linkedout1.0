@@ -58,13 +58,13 @@ export function CreatePostDialog({ open, onOpenChange, userId }: CreatePostDialo
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
 
-  // Fetch user's posting streak data
+  // Fetch user's posting streak data and garden points
   const { data: profileData } = useQuery({
     queryKey: ["profile-posting-streak", userId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("profiles")
-        .select("posting_streak, last_post_date")
+        .select("posting_streak, last_post_date, garden_points")
         .eq("id", userId)
         .single();
       
@@ -76,6 +76,35 @@ export function CreatePostDialog({ open, onOpenChange, userId }: CreatePostDialo
     },
     enabled: open && !!userId, // Only fetch when dialog is open and userId exists
     staleTime: 30 * 1000, // Cache for 30 seconds
+  });
+
+  // Fetch count of posts made today
+  const { data: postsTodayCount = 0 } = useQuery({
+    queryKey: ["posts-today-count", userId],
+    queryFn: async () => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayStart = today.toISOString();
+      
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const tomorrowStart = tomorrow.toISOString();
+
+      const { count, error } = await supabase
+        .from("posts")
+        .select("*", { count: "exact", head: true })
+        .eq("author_id", userId)
+        .gte("created_at", todayStart)
+        .lt("created_at", tomorrowStart);
+      
+      if (error) {
+        console.error("Error counting posts today:", error);
+        return 0;
+      }
+      return count || 0;
+    },
+    enabled: open && !!userId,
+    staleTime: 10 * 1000, // Cache for 10 seconds
   });
 
   // Calculate if this post will contribute to streak
@@ -98,6 +127,55 @@ export function CreatePostDialog({ open, onOpenChange, userId }: CreatePostDialo
     // Otherwise, this will contribute to streak
     return true;
   }, [profileData]);
+
+  // Calculate points for this post
+  const pointsForThisPost = useMemo(() => {
+    const postNumber = postsTodayCount + 1; // This will be the Nth post today
+    
+    // Only first 3 posts get points
+    if (postNumber > 3) {
+      return 0;
+    }
+
+    // Base points: 40, 20, 10
+    const basePoints = postNumber === 1 ? 40 : postNumber === 2 ? 20 : 10;
+    
+    // Bonus: +2 points per consecutive day of posting streak
+    // Day 1: streak = 1, bonus = 0 (40, 20, 10)
+    // Day 2: streak = 2, bonus = 2 (42, 22, 12)
+    // Day 3: streak = 3, bonus = 4 (44, 24, 14)
+    // Formula: (streak - 1) * 2
+    let effectiveStreak = profileData?.posting_streak || 0;
+    
+    if (willContributeToStreak) {
+      // Calculate what the new streak will be (matching handleSubmit logic)
+      const today = new Date().toISOString().split('T')[0];
+      const lastPostDate = profileData?.last_post_date;
+      
+      if (!lastPostDate) {
+        // First post ever - streak will be 1
+        effectiveStreak = 1;
+      } else {
+        // Check if last post was yesterday
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStr = yesterday.toISOString().split('T')[0];
+        
+        if (lastPostDate === yesterdayStr) {
+          // Consecutive day - streak will increment
+          effectiveStreak = effectiveStreak + 1;
+        } else {
+          // Streak broken - streak will reset to 1
+          effectiveStreak = 1;
+        }
+      }
+    }
+    // If not contributing to streak, use current streak
+    
+    const streakBonus = Math.max(0, (effectiveStreak - 1) * 2);
+    
+    return basePoints + streakBonus;
+  }, [postsTodayCount, profileData?.posting_streak, profileData?.last_post_date, willContributeToStreak]);
 
   // Filter tags based on input
   const filteredTags = useMemo(() => {
@@ -249,24 +327,43 @@ export function CreatePostDialog({ open, onOpenChange, userId }: CreatePostDialo
       // Invalidate and refetch posts
       queryClient.invalidateQueries({ queryKey: ["posts"] });
 
-      // Update posting streak
+      // Update posting streak and award points
       const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+      
+      // Count posts made today (including this one)
+      const todayStart = new Date(today + 'T00:00:00.000Z').toISOString();
+      const tomorrowStart = new Date(today + 'T23:59:59.999Z');
+      tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+      const tomorrowStartISO = tomorrowStart.toISOString();
+      
+      const { count: postsTodayCount } = await supabase
+        .from("posts")
+        .select("*", { count: "exact", head: true })
+        .eq("author_id", userId)
+        .gte("created_at", todayStart)
+        .lt("created_at", tomorrowStartISO);
+      
+      const postNumber = (postsTodayCount || 0) + 1; // This is the Nth post today
+      
       const { data: profileData } = await supabase
         .from("profiles")
-        .select("posting_streak, last_post_date")
+        .select("posting_streak, last_post_date, garden_points")
         .eq("id", userId)
         .single();
 
       if (profileData) {
         const lastPostDate = profileData.last_post_date;
         let newStreak = profileData.posting_streak || 0;
+        let willContributeToStreak = false;
 
         if (!lastPostDate) {
           // First post - start streak at 1
           newStreak = 1;
+          willContributeToStreak = true;
         } else if (lastPostDate === today) {
           // Already posted today - don't update streak
           // Keep current streak
+          willContributeToStreak = false;
         } else {
           // Check if last post was yesterday
           const yesterday = new Date();
@@ -276,28 +373,63 @@ export function CreatePostDialog({ open, onOpenChange, userId }: CreatePostDialo
           if (lastPostDate === yesterdayStr) {
             // Consecutive day - increment streak
             newStreak = (profileData.posting_streak || 0) + 1;
+            willContributeToStreak = true;
           } else {
             // Streak broken - reset to 1
             newStreak = 1;
+            willContributeToStreak = true;
           }
         }
 
-        // Update streak and last post date if needed
+        // Calculate points for this post (only first 3 posts get points)
+        let pointsToAward = 0;
+        if (postNumber <= 3) {
+          // Base points: 40, 20, 10
+          const basePoints = postNumber === 1 ? 40 : postNumber === 2 ? 20 : 10;
+          
+          // Bonus: +2 points per consecutive day of posting streak
+          // Day 1: streak = 1, bonus = 0 (40, 20, 10)
+          // Day 2: streak = 2, bonus = 2 (42, 22, 12)
+          // Day 3: streak = 3, bonus = 4 (44, 24, 14)
+          // Formula: (streak - 1) * 2
+          const effectiveStreak = willContributeToStreak ? newStreak : (profileData.posting_streak || 0);
+          const streakBonus = Math.max(0, (effectiveStreak - 1) * 2);
+          
+          pointsToAward = basePoints + streakBonus;
+        }
+
+        // Update streak, last post date, and points
+        const updateData: any = {};
+        
         if (lastPostDate !== today) {
+          updateData.posting_streak = newStreak;
+          updateData.last_post_date = today;
+        }
+        
+        if (pointsToAward > 0) {
+          updateData.garden_points = (profileData.garden_points || 0) + pointsToAward;
+        }
+
+        if (Object.keys(updateData).length > 0) {
           await supabase
             .from("profiles")
-            .update({
-              posting_streak: newStreak,
-              last_post_date: today,
-            })
+            .update(updateData)
             .eq("id", userId);
 
           // Invalidate profile queries to refresh UI
           queryClient.invalidateQueries({ queryKey: ["profile"] });
+          queryClient.invalidateQueries({ queryKey: ["profile-posting-streak", userId] });
         }
+        
+        // Show points notification if awarded
+        if (pointsToAward > 0) {
+          toast.success(`+${pointsToAward} points! Your failure has been shared!`);
+        } else {
+          toast.success("Your failure has been shared!");
+        }
+      } else {
+        toast.success("Your failure has been shared!");
       }
-
-      toast.success("Your failure has been shared!");
       setTitle("");
       setContent("");
       setTags([]);
@@ -323,9 +455,9 @@ export function CreatePostDialog({ open, onOpenChange, userId }: CreatePostDialo
           </DialogDescription>
         </DialogHeader>
 
-        {/* Posting Streak Indicator */}
+        {/* Posting Streak and Points Indicator */}
         {willContributeToStreak !== null && (
-          <div className="mt-4">
+          <div className="mt-4 space-y-2">
             {willContributeToStreak ? (
               <div className="flex items-center gap-2 px-4 py-2 bg-purple-100 dark:bg-purple-900/30 border-[2px] border-purple-500 rounded-md">
                 <Edit2 className="w-4 h-4 text-purple-600 dark:text-purple-400" />
@@ -343,6 +475,35 @@ export function CreatePostDialog({ open, onOpenChange, userId }: CreatePostDialo
                 <Edit2 className="w-4 h-4 text-gray-600 dark:text-gray-400" />
                 <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
                   You've already posted today. This post won't contribute to your posting streak.
+                </span>
+              </div>
+            )}
+            
+            {/* Points Indicator */}
+            {pointsForThisPost !== null && pointsForThisPost !== undefined && (
+              <div className={`flex items-center gap-2 px-4 py-2 border-[2px] rounded-md ${
+                pointsForThisPost > 0 
+                  ? "bg-green-100 dark:bg-green-900/30 border-green-500" 
+                  : "bg-gray-100 dark:bg-gray-800 border-gray-400 dark:border-gray-600"
+              }`}>
+                <span className={`text-sm font-semibold ${
+                  pointsForThisPost > 0 
+                    ? "text-green-700 dark:text-green-300" 
+                    : "text-gray-700 dark:text-gray-300"
+                }`}>
+                  {pointsForThisPost > 0 ? (
+                    <>
+                      This post will earn you <span className="font-bold">+{pointsForThisPost} points</span>
+                      {postsTodayCount === 0 && " (1st post today)"}
+                      {postsTodayCount === 1 && " (2nd post today)"}
+                      {postsTodayCount === 2 && " (3rd post today)"}
+                      {postsTodayCount >= 3 && " (4th+ post today - no points)"}
+                    </>
+                  ) : (
+                    <>
+                      This post won't earn points (4th+ post today)
+                    </>
+                  )}
                 </span>
               </div>
             )}
