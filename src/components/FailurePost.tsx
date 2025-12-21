@@ -246,12 +246,18 @@ export function FailurePost({
     const fetchUserReaction = async () => {
       if (!user || !id) return;
       
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("reactions")
         .select("reaction_type")
         .eq("post_id", id)
         .eq("user_id", user.id)
-        .single();
+        .maybeSingle();
+
+      if (error) {
+        console.error("Error fetching user reaction:", error);
+        setUserReaction(null);
+        return;
+      }
 
       if (data) {
         setUserReaction(data.reaction_type);
@@ -297,7 +303,7 @@ export function FailurePost({
         .select("id, reaction_type")
         .eq("post_id", id)
         .eq("user_id", user.id)
-        .single();
+        .maybeSingle();
 
       let shouldAwardPoints = false;
       let wasLiking = false;

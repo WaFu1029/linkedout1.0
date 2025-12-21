@@ -80,12 +80,18 @@ export function SwipePostCard({ post, currentUserEmail, comments = [], isMobile 
     const fetchUserReaction = async () => {
       if (!user || !post.id) return;
       
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("reactions")
         .select("reaction_type")
         .eq("post_id", post.id)
         .eq("user_id", user.id)
-        .single();
+        .maybeSingle();
+
+      if (error) {
+        console.error("Error fetching user reaction:", error);
+        setUserReaction(null);
+        return;
+      }
 
       if (data) {
         setUserReaction(data.reaction_type);
@@ -288,7 +294,7 @@ export function SwipePostCard({ post, currentUserEmail, comments = [], isMobile 
         .select("id, reaction_type")
         .eq("post_id", post.id)
         .eq("user_id", user.id)
-        .single();
+        .maybeSingle();
 
       let shouldAwardPoints = false;
       let wasLiking = false;
