@@ -20,22 +20,23 @@ export function Footer() {
               <Link to="/feed" className="block hover:text-primary transition-colors">Feed</Link>
               <Link to="/wall" className="block hover:text-primary transition-colors">The Wall</Link>
               <Link to="/auth" className="block hover:text-primary transition-colors">Sign In</Link>
+              <Link to="/manifesto" className="block hover:text-primary transition-colors">Manifesto</Link>
             </div>
           </div>
           <div>
             <h4 className="font-bold mb-4 uppercase tracking-wide">Support</h4>
             <div className="space-y-2">
-              <a href="#" className="block hover:text-primary transition-colors">Help Center</a>
-              <a href="#" className="block hover:text-primary transition-colors">Contact Us</a>
-              <a href="#" className="block hover:text-primary transition-colors">FAQ</a>
+              <Link to="/help" className="block hover:text-primary transition-colors">Help Center</Link>
+              <Link to="/contact" className="block hover:text-primary transition-colors">Contact Us</Link>
+              <Link to="/faq" className="block hover:text-primary transition-colors">FAQ</Link>
             </div>
           </div>
           <div>
             <h4 className="font-bold mb-4 uppercase tracking-wide">Legal</h4>
             <div className="space-y-2">
-              <a href="#" className="block hover:text-primary transition-colors">Privacy Policy</a>
-              <a href="#" className="block hover:text-primary transition-colors">Terms of Service</a>
-              <a href="#" className="block hover:text-primary transition-colors">Cookie Policy</a>
+              <Link to="/privacy" className="block hover:text-primary transition-colors">Privacy Policy</Link>
+              <Link to="/terms" className="block hover:text-primary transition-colors">Terms of Service</Link>
+              <Link to="/cookies" className="block hover:text-primary transition-colors">Cookie Policy</Link>
             </div>
           </div>
         </div>
