@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { X, Plus, Loader2, Check } from "lucide-react";
+import { X, Plus, Loader2, Check, Edit2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
@@ -57,6 +57,47 @@ export function CreatePostDialog({ open, onOpenChange, userId }: CreatePostDialo
     enabled: open, // Only fetch when dialog is open
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
+
+  // Fetch user's posting streak data
+  const { data: profileData } = useQuery({
+    queryKey: ["profile-posting-streak", userId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("posting_streak, last_post_date")
+        .eq("id", userId)
+        .single();
+      
+      if (error) {
+        console.error("Error fetching profile:", error);
+        return null;
+      }
+      return data;
+    },
+    enabled: open && !!userId, // Only fetch when dialog is open and userId exists
+    staleTime: 30 * 1000, // Cache for 30 seconds
+  });
+
+  // Calculate if this post will contribute to streak
+  const willContributeToStreak = useMemo(() => {
+    if (!profileData) return null;
+    
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+    const lastPostDate = profileData.last_post_date;
+    
+    // If no last post date, this will be the first post (contributes to streak)
+    if (!lastPostDate) {
+      return true;
+    }
+    
+    // If already posted today, this won't contribute to streak
+    if (lastPostDate === today) {
+      return false;
+    }
+    
+    // Otherwise, this will contribute to streak
+    return true;
+  }, [profileData]);
 
   // Filter tags based on input
   const filteredTags = useMemo(() => {
@@ -281,6 +322,32 @@ export function CreatePostDialog({ open, onOpenChange, userId }: CreatePostDialo
             Share your failure, setback, or moment of vulnerability with the community.
           </DialogDescription>
         </DialogHeader>
+
+        {/* Posting Streak Indicator */}
+        {willContributeToStreak !== null && (
+          <div className="mt-4">
+            {willContributeToStreak ? (
+              <div className="flex items-center gap-2 px-4 py-2 bg-purple-100 dark:bg-purple-900/30 border-[2px] border-purple-500 rounded-md">
+                <Edit2 className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                <span className="text-sm font-semibold text-purple-700 dark:text-purple-300">
+                  This post will contribute to your posting streak!
+                  {profileData?.posting_streak !== null && profileData?.posting_streak !== undefined && (
+                    <span className="ml-1">
+                      (Current streak: {profileData.posting_streak} day{profileData.posting_streak !== 1 ? 's' : ''})
+                    </span>
+                  )}
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 border-[2px] border-gray-400 dark:border-gray-600 rounded-md">
+                <Edit2 className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                  You've already posted today. This post won't contribute to your posting streak.
+                </span>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="space-y-6 mt-4">
           {/* Title */}
