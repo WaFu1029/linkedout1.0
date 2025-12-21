@@ -1300,6 +1300,7 @@ const Profile = () => {
 
         // Fetch gift notifications from gifts table
         try {
+          console.log("Fetching gift notifications for user:", user.id);
           const { data: gifts, error: giftsError } = await supabase
             .from("gifts")
             .select("id, gifter_id, emoji, quantity, created_at, post_id")
@@ -1314,54 +1315,77 @@ const Profile = () => {
               setGiftNotifications([]);
             } else {
               console.error("Error fetching gifts:", giftsError);
-              setGiftNotifications([]);
-            }
-          } else if (gifts && gifts.length > 0) {
-            // Filter out dismissed gifts
-            const undismissedGifts = gifts.filter(g => !dismissedSet.has(`gift:${g.id}`));
-            
-            if (undismissedGifts.length > 0) {
-              // Fetch gifter profiles separately
-              const gifterIds = [...new Set(undismissedGifts.map(g => g.gifter_id))];
-              const { data: gifterProfiles } = await supabase
-                .from("profiles")
-                .select("id, full_name, email")
-                .in("id", gifterIds);
-
-              const profileMap = new Map(gifterProfiles?.map(p => [p.id, p]) || []);
-              
-              // Fetch post titles for gifts that came from posts
-              const postIds = undismissedGifts.filter(g => g.post_id).map(g => g.post_id);
-              let postMap = new Map<string, string>();
-              if (postIds.length > 0) {
-                const { data: posts } = await supabase
-                  .from("posts")
-                  .select("id, title")
-                  .in("id", postIds);
-                postMap = new Map(posts?.map(p => [p.id, p.title || 'Untitled']) || []);
-              }
-              
-              // Create individual notifications for each gift (not aggregated)
-              const giftNotifs = undismissedGifts.map(gift => {
-                const gifterProfile = profileMap.get(gift.gifter_id);
-                return {
-                  id: gift.id, // Include the gift ID for tracking dismissed notifications
-                  gifter_id: gift.gifter_id,
-                  gifter_name: gifterProfile?.full_name || null,
-                  gifter_email: gifterProfile?.email || null,
-                  emoji: gift.emoji,
-                  quantity: gift.quantity,
-                  created_at: gift.created_at,
-                  post_id: gift.post_id || null,
-                  post_title: gift.post_id ? (postMap.get(gift.post_id) || null) : null
-                };
-              });
-              setGiftNotifications(giftNotifs);
-            } else {
+              console.error("Gifts error details:", JSON.stringify(giftsError, null, 2));
               setGiftNotifications([]);
             }
           } else {
-            setGiftNotifications([]);
+            console.log("Fetched gifts:", gifts?.length || 0, "gifts");
+            if (gifts && gifts.length > 0) {
+              console.log("Sample gift:", gifts[0]);
+              // Filter out dismissed gifts
+              const undismissedGifts = gifts.filter(g => !dismissedSet.has(`gift:${g.id}`));
+              console.log("Undismissed gifts:", undismissedGifts.length);
+              
+              if (undismissedGifts.length > 0) {
+                // Fetch gifter profiles separately
+                const gifterIds = [...new Set(undismissedGifts.map(g => g.gifter_id))];
+                const { data: gifterProfiles, error: profileError } = await supabase
+                  .from("profiles")
+                  .select("id, full_name, email")
+                  .in("id", gifterIds);
+
+                if (profileError) {
+                  console.error("Error fetching gifter profiles:", profileError);
+                }
+
+                const profileMap = new Map(gifterProfiles?.map(p => [p.id, p]) || []);
+                
+                // Fetch post titles for gifts that came from posts
+                const postIds = undismissedGifts.filter(g => g.post_id).map(g => g.post_id).filter(Boolean) as string[];
+                console.log("Post IDs for gifts:", postIds);
+                let postMap = new Map<string, string>();
+                if (postIds.length > 0) {
+                  const { data: posts, error: postsError } = await supabase
+                    .from("posts")
+                    .select("id, title")
+                    .in("id", postIds);
+                  
+                  if (postsError) {
+                    console.error("Error fetching post titles:", postsError);
+                  } else {
+                    console.log("Fetched posts for titles:", posts);
+                  }
+                  
+                  postMap = new Map(posts?.map(p => [p.id, p.title || 'Untitled']) || []);
+                }
+                
+                // Create individual notifications for each gift (not aggregated)
+                const giftNotifs = undismissedGifts.map(gift => {
+                  const gifterProfile = profileMap.get(gift.gifter_id);
+                  const postTitle = gift.post_id ? (postMap.get(gift.post_id) || null) : null;
+                  console.log(`Gift ${gift.id}: post_id=${gift.post_id}, post_title=${postTitle}`);
+                  return {
+                    id: gift.id, // Include the gift ID for tracking dismissed notifications
+                    gifter_id: gift.gifter_id,
+                    gifter_name: gifterProfile?.full_name || null,
+                    gifter_email: gifterProfile?.email || null,
+                    emoji: gift.emoji,
+                    quantity: gift.quantity,
+                    created_at: gift.created_at,
+                    post_id: gift.post_id || null,
+                    post_title: postTitle
+                  };
+                });
+                console.log("Setting gift notifications:", giftNotifs.length);
+                setGiftNotifications(giftNotifs);
+              } else {
+                console.log("All gifts were dismissed");
+                setGiftNotifications([]);
+              }
+            } else {
+              console.log("No gifts found");
+              setGiftNotifications([]);
+            }
           }
         } catch (giftError) {
           console.error("Error in gift notifications fetch:", giftError);

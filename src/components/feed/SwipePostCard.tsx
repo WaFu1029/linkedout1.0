@@ -226,7 +226,15 @@ export function SwipePostCard({ post, currentUserEmail, comments = [], isMobile 
 
       // Create gift record for notifications (one record per transaction with actual quantity)
       try {
-        const { error: giftsError } = await supabase
+        console.log("Creating gift record:", {
+          gifter_id: user.id,
+          recipient_id: post.author_id,
+          emoji: emoji,
+          quantity: quantity,
+          post_id: post.id
+        });
+        
+        const { data: giftData, error: giftsError } = await supabase
           .from("gifts")
           .insert({
             gifter_id: user.id,
@@ -234,11 +242,16 @@ export function SwipePostCard({ post, currentUserEmail, comments = [], isMobile 
             emoji: emoji,
             quantity: quantity,
             post_id: post.id, // Track which post this gift came from
-          });
+          })
+          .select()
+          .single();
 
         if (giftsError) {
           console.error("Error creating gift records:", giftsError);
+          console.error("Gift error details:", JSON.stringify(giftsError, null, 2));
           // Don't throw - gift was successful, notification is secondary
+        } else {
+          console.log("Gift record created successfully:", giftData);
         }
       } catch (giftRecordError) {
         console.error("Error creating gift records:", giftRecordError);
