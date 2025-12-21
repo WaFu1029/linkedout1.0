@@ -1558,7 +1558,12 @@ const Profile = () => {
               lastLoginDate,
               currentStreak: newStreak,
               userTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-              localTime: now.toLocaleString()
+              localTime: now.toLocaleString(),
+              comparison: {
+                areEqual: lastLoginDate === today,
+                todayType: typeof today,
+                lastLoginDateType: typeof lastLoginDate
+              }
             });
             
             if (!lastLoginDate) {
