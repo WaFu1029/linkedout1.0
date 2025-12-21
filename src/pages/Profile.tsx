@@ -1542,33 +1542,68 @@ const Profile = () => {
           
           // Update login streak if viewing own profile
           if (isViewingOwnProfile && user?.id === data.id) {
-            const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+            // Use local date, not UTC, to match user's calendar day
+            const now = new Date();
+            const today = now.toISOString().split('T')[0]; // YYYY-MM-DD format (UTC)
+            // Also calculate local date for comparison
+            const localDate = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+            
             const lastLoginDate = data.last_login_date;
             let newStreak = data.login_streak || 0;
+            
+            console.log("Login streak check:", {
+              today,
+              localDate,
+              lastLoginDate,
+              currentStreak: newStreak,
+              userTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+            });
             
             if (!lastLoginDate) {
               // First login - start streak at 1
               newStreak = 1;
-            } else if (lastLoginDate === today) {
+              console.log("First login - starting streak at 1");
+            } else if (lastLoginDate === today || lastLoginDate === localDate) {
               // Already logged in today - don't update streak
               // Do nothing, keep current streak
+              console.log("Already logged in today - keeping streak at", newStreak);
             } else {
               // Check if last login was yesterday
               const yesterday = new Date();
               yesterday.setDate(yesterday.getDate() - 1);
               const yesterdayStr = yesterday.toISOString().split('T')[0];
               
-              if (lastLoginDate === yesterdayStr) {
+              // Also check local yesterday
+              const localYesterday = new Date(yesterday.getTime() - yesterday.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+              
+              console.log("Checking if consecutive:", {
+                lastLoginDate,
+                yesterdayStr,
+                localYesterday,
+                isConsecutive: lastLoginDate === yesterdayStr || lastLoginDate === localYesterday
+              });
+              
+              if (lastLoginDate === yesterdayStr || lastLoginDate === localYesterday) {
                 // Consecutive day - increment streak
                 newStreak = (data.login_streak || 0) + 1;
+                console.log("Consecutive day - incrementing streak to", newStreak);
               } else {
                 // Streak broken - reset to 1
                 newStreak = 1;
+                console.log("Streak broken - resetting to 1");
               }
             }
             
             // Update streak and last login date if needed
-            if (lastLoginDate !== today) {
+            // Use today (UTC) for consistency in database
+            if (lastLoginDate !== today && lastLoginDate !== localDate) {
+              console.log("Updating login streak:", {
+                oldStreak: data.login_streak,
+                newStreak,
+                oldDate: lastLoginDate,
+                newDate: today
+              });
+              
               const { error: streakError } = await supabase
                 .from("profiles")
                 .update({
@@ -1577,7 +1612,10 @@ const Profile = () => {
                 })
                 .eq("id", user.id);
               
-              if (!streakError) {
+              if (streakError) {
+                console.error("Error updating login streak:", streakError);
+              } else {
+                console.log("Login streak updated successfully");
                 // Update local profile state
                 setProfile({
                   ...data,
@@ -1585,6 +1623,8 @@ const Profile = () => {
                   last_login_date: today,
                 });
               }
+            } else {
+              console.log("No update needed - already logged in today");
             }
           }
           
