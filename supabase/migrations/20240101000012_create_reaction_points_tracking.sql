@@ -14,6 +14,10 @@ CREATE TABLE IF NOT EXISTS public.reaction_points_awarded (
 ALTER TABLE public.reaction_points_awarded ENABLE ROW LEVEL SECURITY;
 
 -- Create policies
+
+
+
+
 CREATE POLICY "Users can view their own points awarded" ON public.reaction_points_awarded
   FOR SELECT
   USING (auth.uid() = author_id OR auth.uid() = user_id);
