@@ -1,6 +1,5 @@
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
-import { Card } from "@/components/ui/card";
 import { Link } from "react-router-dom";
 
 export default function CookiePolicy() {
@@ -8,7 +7,7 @@ export default function CookiePolicy() {
     <div className="min-h-screen bg-background flex flex-col">
       <Navbar />
       <main className="flex-1 container mx-auto px-4 py-12 max-w-4xl">
-        <Card className="border-[3px] border-foreground shadow-brutal p-8 md:p-12">
+        <div className="p-8 md:p-12">
           <h1 className="text-4xl md:text-5xl font-bold mb-8">Cookie Policy</h1>
           
           <div className="space-y-6 text-lg leading-relaxed">
@@ -100,7 +99,7 @@ export default function CookiePolicy() {
               </p>
             </section>
           </div>
-        </Card>
+        </div>
       </main>
       <Footer />
     </div>

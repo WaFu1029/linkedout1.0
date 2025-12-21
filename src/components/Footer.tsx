@@ -17,9 +17,6 @@ export function Footer() {
           <div>
             <h4 className="font-bold mb-4 uppercase tracking-wide">Resources</h4>
             <div className="space-y-2">
-              <Link to="/feed" className="block hover:text-primary transition-colors">Feed</Link>
-              <Link to="/wall" className="block hover:text-primary transition-colors">The Wall</Link>
-              <Link to="/auth" className="block hover:text-primary transition-colors">Sign In</Link>
               <Link to="/manifesto" className="block hover:text-primary transition-colors">Manifesto</Link>
             </div>
           </div>

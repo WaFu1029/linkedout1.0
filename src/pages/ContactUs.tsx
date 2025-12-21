@@ -1,6 +1,5 @@
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -35,7 +34,7 @@ export default function ContactUs() {
     <div className="min-h-screen bg-background flex flex-col">
       <Navbar />
       <main className="flex-1 container mx-auto px-4 py-12 max-w-2xl">
-        <Card className="border-[3px] border-foreground shadow-brutal p-8 md:p-12">
+        <div className="p-8 md:p-12">
           <h1 className="text-4xl md:text-5xl font-bold mb-8">Contact Us</h1>
           
           <p className="text-lg mb-8 text-muted-foreground">
@@ -92,7 +91,7 @@ export default function ContactUs() {
               {isSubmitting ? "Sending..." : "Send Message"}
             </Button>
           </form>
-        </Card>
+        </div>
       </main>
       <Footer />
     </div>
