@@ -16,3 +16,4 @@ FOREIGN KEY (gifter_id) REFERENCES auth.users(id) ON DELETE CASCADE;
 ALTER TABLE public.gifts
 ADD CONSTRAINT gifts_recipient_id_fkey
 FOREIGN KEY (recipient_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+

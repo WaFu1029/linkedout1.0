@@ -32,3 +32,4 @@ CREATE POLICY "Users can create gifts" ON public.gifts
   );
 
 
+

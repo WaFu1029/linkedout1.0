@@ -1309,15 +1309,19 @@ const Profile = () => {
             .limit(50);
 
           if (giftsError) {
+            // Log all error details for debugging
+            console.error("Error fetching gifts:", giftsError);
+            console.error("Gifts error code:", giftsError.code);
+            console.error("Gifts error message:", giftsError.message);
+            console.error("Gifts error details:", JSON.stringify(giftsError, null, 2));
+            
             // If table doesn't exist, that's okay - just log and continue
             if (giftsError.code === '42P01' || giftsError.message?.includes('does not exist')) {
               console.log("Gifts table doesn't exist yet. Run migration 20240101000010_create_gifts_table.sql");
-              setGiftNotifications([]);
             } else {
-              console.error("Error fetching gifts:", giftsError);
-              console.error("Gifts error details:", JSON.stringify(giftsError, null, 2));
-              setGiftNotifications([]);
+              console.error("Gifts query failed - this might be an RLS policy issue or table structure issue");
             }
+            setGiftNotifications([]);
           } else {
             console.log("Fetched gifts:", gifts?.length || 0, "gifts");
             if (gifts && gifts.length > 0) {
