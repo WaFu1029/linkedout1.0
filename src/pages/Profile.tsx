@@ -2526,7 +2526,7 @@ const Profile = () => {
                                     </span>
                                     {" "}gifted you {gift.quantity}x {gift.emoji}
                                     {gift.post_title && (
-                                      <> from your post, "{gift.post_title}"</>
+                                      <> from your post, {gift.post_title}</>
                                     )}
                                   </p>
                                   <p className="text-xs text-muted-foreground mt-1">
@@ -2672,7 +2672,7 @@ const Profile = () => {
                                   </span>
                                   {" "}gifted you {gift.quantity}x {gift.emoji}
                                   {gift.post_title && (
-                                    <> from your post, "{gift.post_title}"</>
+                                    <> from your post, {gift.post_title}</>
                                   )}
                                 </p>
                                 <p className="text-xs text-muted-foreground mt-1">
