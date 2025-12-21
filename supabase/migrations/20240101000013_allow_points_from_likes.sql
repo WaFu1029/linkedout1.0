@@ -9,3 +9,5 @@ CREATE POLICY "Users can award points and gift from posts" ON public.profiles
   FOR UPDATE
   USING (auth.uid() IS NOT NULL) -- Must be authenticated
   WITH CHECK (auth.uid() IS NOT NULL); -- Must be authenticated
+
+

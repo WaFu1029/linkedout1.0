@@ -26,3 +26,5 @@ CREATE POLICY "System can insert points awarded records" ON public.reaction_poin
 CREATE INDEX IF NOT EXISTS idx_reaction_points_post_id ON public.reaction_points_awarded(post_id);
 CREATE INDEX IF NOT EXISTS idx_reaction_points_user_id ON public.reaction_points_awarded(user_id);
 CREATE INDEX IF NOT EXISTS idx_reaction_points_author_id ON public.reaction_points_awarded(author_id);
+
+

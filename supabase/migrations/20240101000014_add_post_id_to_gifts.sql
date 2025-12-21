@@ -30,3 +30,5 @@ CREATE POLICY "Users can create gifts" ON public.gifts
       OR post_id IS NOT NULL
     )
   );
+
+
