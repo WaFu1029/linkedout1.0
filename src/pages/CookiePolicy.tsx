@@ -23,7 +23,7 @@ export default function CookiePolicy() {
             
             <section>
               <h2 className="text-2xl font-bold mt-8 mb-4">How We Use Cookies</h2>
-              <p>LinkedOut uses cookies for:</p>
+              <p>LuckedOut uses cookies for:</p>
               <ul className="list-disc list-inside ml-4 space-y-2 mt-2">
                 <li><strong>Authentication:</strong> To keep you logged in and secure your session</li>
                 <li><strong>Preferences:</strong> To remember your theme settings and preferences</li>
@@ -38,7 +38,7 @@ export default function CookiePolicy() {
                 <div>
                   <h3 className="font-semibold text-xl mb-2">Essential Cookies</h3>
                   <p>
-                    These are necessary for LinkedOut to function. They enable core features like 
+                    These are necessary for LuckedOut to function. They enable core features like 
                     authentication and cannot be disabled.
                   </p>
                 </div>
@@ -52,7 +52,7 @@ export default function CookiePolicy() {
                 <div>
                   <h3 className="font-semibold text-xl mb-2">Analytics Cookies</h3>
                   <p>
-                    These help us understand how users interact with LinkedOut so we can improve 
+                    These help us understand how users interact with LuckedOut so we can improve 
                     the platform.
                   </p>
                 </div>
@@ -63,7 +63,7 @@ export default function CookiePolicy() {
               <h2 className="text-2xl font-bold mt-8 mb-4">Managing Cookies</h2>
               <p>
                 You can control cookies through your browser settings. However, disabling certain 
-                cookies may limit your ability to use some features of LinkedOut. Most browsers 
+                cookies may limit your ability to use some features of LuckedOut. Most browsers 
                 allow you to:
               </p>
               <ul className="list-disc list-inside ml-4 space-y-2 mt-2">
@@ -78,7 +78,7 @@ export default function CookiePolicy() {
               <h2 className="text-2xl font-bold mt-8 mb-4">Third-Party Cookies</h2>
               <p>
                 We may use third-party services that set their own cookies. These services help us 
-                provide and improve LinkedOut. We do not control these cookies, so please refer to 
+                provide and improve LuckedOut. We do not control these cookies, so please refer to 
                 the respective privacy policies of these third parties.
               </p>
             </section>

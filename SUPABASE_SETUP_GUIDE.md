@@ -7,7 +7,7 @@
 3. Sign up with GitHub, Google, or email
 4. Once logged in, click **"New Project"**
 5. Fill in the project details:
-   - **Name**: LinkedOut (or whatever you prefer)
+   - **Name**: LuckedOut (or whatever you prefer)
    - **Database Password**: Create a strong password (save this somewhere safe!)
    - **Region**: Choose the closest region to you
 6. Click **"Create new project"** (this takes a few minutes)

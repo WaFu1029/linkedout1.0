@@ -20,7 +20,7 @@ export default function HelpCenter() {
                 <AccordionTrigger className="text-left font-semibold">Getting Started</AccordionTrigger>
                 <AccordionContent className="text-muted-foreground">
                   <p className="mb-2">
-                    To get started on LinkedOut, simply create an account and start sharing your failures! 
+                    To get started on LuckedOut, simply create an account and start sharing your failures! 
                     You can connect with others, build your garden, and embrace vulnerability.
                   </p>
                 </AccordionContent>
@@ -51,7 +51,7 @@ export default function HelpCenter() {
                 <AccordionTrigger className="text-left font-semibold">What are connections?</AccordionTrigger>
                 <AccordionContent className="text-muted-foreground">
                   <p className="mb-2">
-                    Connections are mutual friendships on LinkedOut. When you connect with someone, you can 
+                    Connections are mutual friendships on LuckedOut. When you connect with someone, you can 
                     view each other's gardens and gift vegetables to each other.
                   </p>
                 </AccordionContent>

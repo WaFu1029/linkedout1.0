@@ -16,7 +16,7 @@ export default function PrivacyPolicy() {
             <section>
               <h2 className="text-2xl font-bold mt-8 mb-4">Introduction</h2>
               <p>
-                At LinkedOut, we respect your privacy and are committed to protecting your personal data. 
+                At LuckedOut, we respect your privacy and are committed to protecting your personal data. 
                 This privacy policy explains how we collect, use, and safeguard your information when you 
                 use our platform.
               </p>

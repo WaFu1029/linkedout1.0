@@ -5,8 +5,8 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 export default function FAQ() {
   const faqs = [
     {
-      question: "What is LinkedOut?",
-      answer: "LinkedOut is a platform that celebrates failure and vulnerability. Instead of showcasing only successes like traditional LinkedIn, we encourage users to share their failures, connect authentically, and build resilience together."
+      question: "What is LuckedOut?",
+      answer: "LuckedOut is a platform that celebrates failure and vulnerability. Instead of showcasing only successes like traditional LinkedIn, we encourage users to share their failures, connect authentically, and build resilience together."
     },
     {
       question: "How do I earn points?",
@@ -30,7 +30,7 @@ export default function FAQ() {
     },
     {
       question: "What is the login streak?",
-      answer: "Your login streak tracks consecutive days you've logged into LinkedOut. It resets if you miss a day, but you can build it back up by logging in daily!"
+      answer: "Your login streak tracks consecutive days you've logged into LuckedOut. It resets if you miss a day, but you can build it back up by logging in daily!"
     },
     {
       question: "Can I delete my account?",

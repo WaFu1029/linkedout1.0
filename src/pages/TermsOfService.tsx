@@ -16,7 +16,7 @@ export default function TermsOfService() {
             <section>
               <h2 className="text-2xl font-bold mt-8 mb-4">Acceptance of Terms</h2>
               <p>
-                By accessing and using LinkedOut, you accept and agree to be bound by these Terms of Service. 
+                By accessing and using LuckedOut, you accept and agree to be bound by these Terms of Service. 
                 If you do not agree to these terms, please do not use our platform.
               </p>
             </section>
@@ -25,7 +25,7 @@ export default function TermsOfService() {
               <h2 className="text-2xl font-bold mt-8 mb-4">Use of Service</h2>
               <p>You agree to:</p>
               <ul className="list-disc list-inside ml-4 space-y-2 mt-2">
-                <li>Use LinkedOut only for lawful purposes</li>
+                <li>Use LuckedOut only for lawful purposes</li>
                 <li>Not engage in any fraudulent or abusive behavior</li>
                 <li>Respect other users and their content</li>
                 <li>Not attempt to manipulate the points or gift system</li>
@@ -36,7 +36,7 @@ export default function TermsOfService() {
             <section>
               <h2 className="text-2xl font-bold mt-8 mb-4">User Content</h2>
               <p>
-                You retain ownership of content you post on LinkedOut. By posting, you grant us a license 
+                You retain ownership of content you post on LuckedOut. By posting, you grant us a license 
                 to use, display, and distribute your content on the platform. You are responsible for 
                 ensuring your content does not violate any laws or infringe on others' rights.
               </p>
@@ -65,7 +65,7 @@ export default function TermsOfService() {
             <section>
               <h2 className="text-2xl font-bold mt-8 mb-4">Limitation of Liability</h2>
               <p>
-                LinkedOut is provided "as is" without warranties. We are not liable for any damages 
+                LuckedOut is provided "as is" without warranties. We are not liable for any damages 
                 arising from your use of the platform. Your failures are your own responsibility.
               </p>
             </section>
@@ -73,7 +73,7 @@ export default function TermsOfService() {
             <section>
               <h2 className="text-2xl font-bold mt-8 mb-4">Changes to Terms</h2>
               <p>
-                We may update these terms from time to time. Continued use of LinkedOut after changes 
+                We may update these terms from time to time. Continued use of LuckedOut after changes 
                 constitutes acceptance of the new terms.
               </p>
             </section>

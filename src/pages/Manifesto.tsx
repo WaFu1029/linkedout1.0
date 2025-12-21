@@ -7,7 +7,7 @@ export default function Manifesto() {
       <Navbar />
       <main className="flex-1 container mx-auto px-4 py-12 max-w-4xl">
         <div className="p-8 md:p-12">
-          <h1 className="text-4xl md:text-5xl font-bold mb-8">LinkedOut Manifesto</h1>
+          <h1 className="text-4xl md:text-5xl font-bold mb-8">LuckedOut Manifesto</h1>
           
           <div className="space-y-6 text-lg leading-relaxed">
             <p className="text-xl font-semibold">
@@ -21,7 +21,7 @@ export default function Manifesto() {
             </p>
             
             <p>
-              <strong>LinkedOut is different.</strong> We celebrate failure. We embrace vulnerability. 
+              <strong>LuckedOut is different.</strong> We celebrate failure. We embrace vulnerability. 
               We believe that sharing our struggles makes us stronger, not weaker.
             </p>
             
@@ -45,7 +45,7 @@ export default function Manifesto() {
             
             <p>
               Share your failures. Connect with others who understand. Build a garden of resilience. 
-              Because on LinkedOut, your failures are your greatest asset.
+              Because on LuckedOut, your failures are your greatest asset.
             </p>
             
             <p className="text-xl font-semibold mt-8 pt-8 border-t-[3px] border-foreground">

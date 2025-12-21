@@ -38,7 +38,7 @@ export function Footer() {
           </div>
         </div>
         <div className="border-t border-background/20 mt-8 pt-8 text-center text-sm opacity-60">
-          © 2024 LinkedOut. All failures reserved.
+          © 2024 LuckedOut. All failures reserved.
         </div>
       </div>
     </footer>

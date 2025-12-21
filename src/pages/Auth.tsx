@@ -174,7 +174,7 @@ const Auth = () => {
             // Continue anyway as auth was successful
           }
 
-          toast.success("Welcome to LinkedOut! Ready to embrace your failures.");
+          toast.success("Welcome to LuckedOut! Ready to embrace your failures.");
           navigate("/profile");
         }
       } else {
@@ -325,7 +325,7 @@ const Auth = () => {
             <p className="text-center mt-8 text-muted-foreground font-mono text-sm">
               "The first step to growth is admitting you're a mess."
               <br />
-              — Everyone on LinkedOut
+              — Everyone on LuckedOut
             </p>
           </div>
         </div>
