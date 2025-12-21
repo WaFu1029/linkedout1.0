@@ -2100,7 +2100,7 @@ const Profile = () => {
                         </span>
                       </div>
                     )}
-                    {profile.posting_streak !== null && profile.posting_streak !== undefined && profile.posting_streak > 0 && (
+                    {profile.posting_streak !== null && profile.posting_streak !== undefined && (
                       <div className="flex items-center gap-1 px-3 py-1 bg-purple-100 dark:bg-purple-900/30 border-[2px] border-purple-500 rounded-md">
                         <Edit2 className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                         <span className="text-sm font-bold text-purple-700 dark:text-purple-300">
