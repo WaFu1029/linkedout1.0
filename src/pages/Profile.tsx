@@ -1542,61 +1542,62 @@ const Profile = () => {
           
           // Update login streak if viewing own profile
           if (isViewingOwnProfile && user?.id === data.id) {
-            // Use local date, not UTC, to match user's calendar day
+            // Use local date to match user's calendar day, not UTC
             const now = new Date();
-            const today = now.toISOString().split('T')[0]; // YYYY-MM-DD format (UTC)
-            // Also calculate local date for comparison
-            const localDate = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+            // Get local date string (YYYY-MM-DD) by using local timezone
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const today = `${year}-${month}-${day}`;
             
             const lastLoginDate = data.last_login_date;
             let newStreak = data.login_streak || 0;
             
             console.log("Login streak check:", {
               today,
-              localDate,
               lastLoginDate,
               currentStreak: newStreak,
-              userTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+              userTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+              localTime: now.toLocaleString()
             });
             
             if (!lastLoginDate) {
               // First login - start streak at 1
               newStreak = 1;
               console.log("First login - starting streak at 1");
-            } else if (lastLoginDate === today || lastLoginDate === localDate) {
+            } else if (lastLoginDate === today) {
               // Already logged in today - don't update streak
               // Do nothing, keep current streak
               console.log("Already logged in today - keeping streak at", newStreak);
             } else {
-              // Check if last login was yesterday
-              const yesterday = new Date();
+              // Check if last login was yesterday (in local time)
+              const yesterday = new Date(now);
               yesterday.setDate(yesterday.getDate() - 1);
-              const yesterdayStr = yesterday.toISOString().split('T')[0];
-              
-              // Also check local yesterday
-              const localYesterday = new Date(yesterday.getTime() - yesterday.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+              const yesterdayYear = yesterday.getFullYear();
+              const yesterdayMonth = String(yesterday.getMonth() + 1).padStart(2, '0');
+              const yesterdayDay = String(yesterday.getDate()).padStart(2, '0');
+              const yesterdayStr = `${yesterdayYear}-${yesterdayMonth}-${yesterdayDay}`;
               
               console.log("Checking if consecutive:", {
                 lastLoginDate,
                 yesterdayStr,
-                localYesterday,
-                isConsecutive: lastLoginDate === yesterdayStr || lastLoginDate === localYesterday
+                isConsecutive: lastLoginDate === yesterdayStr
               });
               
-              if (lastLoginDate === yesterdayStr || lastLoginDate === localYesterday) {
+              if (lastLoginDate === yesterdayStr) {
                 // Consecutive day - increment streak
                 newStreak = (data.login_streak || 0) + 1;
                 console.log("Consecutive day - incrementing streak to", newStreak);
               } else {
                 // Streak broken - reset to 1
                 newStreak = 1;
-                console.log("Streak broken - resetting to 1");
+                console.log("Streak broken - resetting to 1. Last login was:", lastLoginDate, "Today is:", today);
               }
             }
             
             // Update streak and last login date if needed
-            // Use today (UTC) for consistency in database
-            if (lastLoginDate !== today && lastLoginDate !== localDate) {
+            // Store as local date string for consistency
+            if (lastLoginDate !== today) {
               console.log("Updating login streak:", {
                 oldStreak: data.login_streak,
                 newStreak,
