@@ -7,7 +7,7 @@ export function Footer() {
         <div className="grid md:grid-cols-4 gap-8">
           <div>
           <div className="flex items-center gap-0 mb-4">
-  <span className="text-2xl font-bold pr-1">Linked</span>
+  <span className="text-2xl font-bold pr-1">Lucked</span>
   <span className="text-2xl font-bold bg-primary text-primary-foreground pl-1 pr-1.5 py-0.5">Out</span>
 </div>
             <p className="text-sm opacity-80">

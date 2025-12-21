@@ -15,7 +15,7 @@ export function Navbar() {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
         <Link to="/" className="flex items-center gap-0">
-  <span className="text-2xl font-bold pr-1">Linked</span>
+  <span className="text-2xl font-bold pr-1">Lucked</span>
   <span className="text-2xl font-bold text-primary bg-foreground pl-1 pr-1.5 py-0.5">Out</span>
 </Link>
 
